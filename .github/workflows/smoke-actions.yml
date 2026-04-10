@@ -1,0 +1,13 @@
+# Minimal workflow — agar is par yellow dot / run dikhe to Actions ON hai aur path sahi hai.
+name: Smoke Actions OK
+'on':
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ${{ vars.GHA_RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - run: echo "GitHub Actions is running"

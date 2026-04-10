@@ -1,6 +1,5 @@
 name: Build and push to Azure ACR
-
-on:
+'on':
   push:
     branches:
       - main
@@ -17,7 +16,7 @@ permissions:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.GHA_RUNS_ON || 'ubuntu-latest' }}
     env:
       # Image repo name = GitHub repo (lowercase); rename repo → new image path automatically
       IMAGE_NAME: ${{ toLower(github.event.repository.name) }}
@@ -70,7 +69,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Deploy reference (Argo / Helm — pin by digest)
+      - name: Deploy reference (Argo / Helm - pin by digest)
         run: |
           {
             echo "### Container image (enterprise)"
