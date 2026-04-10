@@ -3,8 +3,15 @@ const express = require("express");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get("/welcome", (req, res) => {
-  res.type("text/plain").send("Welcome!");
+app.get("/", (req, res) => {
+  res.type("html").send(`<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Welcome</title></head>
+<body>
+  <h1>Welcome!</h1>
+  <p><a href="/data">GET /data</a> — JSON response</p>
+</body>
+</html>`);
 });
 
 app.get("/data", (req, res) => {
@@ -18,6 +25,6 @@ app.get("/data", (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running at http://localhost:${PORT}/`);
 });
