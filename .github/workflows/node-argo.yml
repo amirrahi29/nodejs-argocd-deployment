@@ -1,9 +1,10 @@
 name: Build and push to Azure ACR
 
-# Quoted 'on' avoids YAML 1.1 parsing `on` as boolean (breaks workflow registration on some setups).
-'on':
-  push: {}
-  workflow_dispatch: {}
+"on":
+  push:
+    branches:
+      - "**"
+  workflow_dispatch:
 
 env:
   AZURE_CONTAINER_REGISTRY: rahicontainerregistry.azurecr.io
