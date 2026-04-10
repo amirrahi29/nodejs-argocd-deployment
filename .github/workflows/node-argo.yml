@@ -13,15 +13,28 @@ env:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
   ci-started:
     name: CI started (trigger OK)
     runs-on: ubuntu-latest
     steps:
+      - name: Commit status pending (Code tab yellow dot)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: 'pending',
+              context: 'ACR / Azure pipeline',
+              description: 'Pipeline running…',
+              target_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+            });
       - run: |
           echo "Workflow triggered for ref=${{ github.ref }} sha=${{ github.sha }}"
-          echo "Yellow dot = ye job ya 'Build and push' abhi chal raha hai."
 
   build-and-push:
     name: Build and push image
@@ -110,3 +123,26 @@ jobs:
             echo "| Git SHA | \`${{ github.sha }}\` |"
             echo "| Workflow run | [\`${{ github.run_id }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  commit-status:
+    name: Final commit status
+    needs: [ci-started, build-and-push]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Commit status success or failure (Code tab icon)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ci = '${{ needs.ci-started.result }}';
+            const build = '${{ needs.build-and-push.result }}';
+            const ok = ci === 'success' && build === 'success';
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: ok ? 'success' : 'failure',
+              context: 'ACR / Azure pipeline',
+              description: ok ? 'Image pushed to ACR' : 'Failed — open Actions for logs',
+              target_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+            });
