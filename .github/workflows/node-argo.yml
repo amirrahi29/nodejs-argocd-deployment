@@ -9,7 +9,11 @@ on:
       - staging
 
 env:
-  ACR_NAME: chatappregsistry
+  ACR_NAME: rahicontaineregistry
+  ACR_LOGIN_SERVER: rahicontaineregistry.azurecr.io
+  AZURE_RESOURCE_GROUP: RahiResource
+  AZURE_SUBSCRIPTION_ID: dde8a869-f29f-41ae-90ea-0047779211e6
+  AZURE_LOCATION: East US
   IMAGE_NAME: chat-app
 
 permissions:
@@ -38,15 +42,15 @@ jobs:
 
       - name: Build Docker image
         run: |
-          echo "Building ${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}"
-          docker build -t "${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}" .
+          echo "Building ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
+          docker build -t "${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}" .
 
       - name: Push Docker image
         run: |
           echo "Pushing image..."
-          docker push "${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}"
+          docker push "${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
 
       - name: Output image info
         run: |
           echo "Image pushed:"
-          echo "${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}"
+          echo "${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
