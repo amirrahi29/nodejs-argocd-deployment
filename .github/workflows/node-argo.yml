@@ -24,6 +24,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Require AZURE_CREDENTIALS secret
+        env:
+          HAS_CREDS: ${{ secrets.AZURE_CREDENTIALS != '' }}
+        run: |
+          if [ "$HAS_CREDS" != "true" ]; then
+            echo "::error::Repo secret AZURE_CREDENTIALS missing — Settings → Secrets and variables → Actions → New repository secret"
+            exit 1
+          fi
+
       - name: Azure login (AZURE_CREDENTIALS JSON)
         uses: azure/login@v2
         with:
