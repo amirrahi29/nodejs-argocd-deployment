@@ -1,11 +1,9 @@
 name: Build and push to Azure ACR
+
+# Quoted 'on' avoids YAML 1.1 parsing `on` as boolean (breaks workflow registration on some setups).
 'on':
-  push:
-    branches:
-      - main
-    tags:
-      - "v*"
-  workflow_dispatch:
+  push: {}
+  workflow_dispatch: {}
 
 env:
   AZURE_CONTAINER_REGISTRY: rahicontainerregistry.azurecr.io
@@ -16,9 +14,8 @@ permissions:
 
 jobs:
   build-and-push:
-    runs-on: ${{ vars.GHA_RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     env:
-      # Image repo name = GitHub repo (lowercase); rename repo → new image path automatically
       IMAGE_NAME: ${{ toLower(github.event.repository.name) }}
     steps:
       - name: Checkout
