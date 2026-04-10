@@ -22,7 +22,7 @@ app.get("/data", (req, res) => {
       { id: 2, name: "Beta" },
     ],
     timestamp: new Date().toISOString(),
-  });
+  });  
 });
 
 app.listen(PORT, "0.0.0.0", () => {
