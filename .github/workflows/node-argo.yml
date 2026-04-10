@@ -1,148 +1,51 @@
-name: Build and push to Azure ACR
-run-name: ACR ${{ github.ref_name }} @ ${{ github.sha }}
+name: Build & Push Docker Image
 
-"on":
+on:
   push:
     branches:
-      - "**"
-  workflow_dispatch:
+      - dev
+      - uat
+      - staging
 
 env:
-  AZURE_CONTAINER_REGISTRY: rahicontainerregistry.azurecr.io
-  ACR_NAME: rahicontainerregistry
+  ACR_NAME: chatappregsistry
+  IMAGE_NAME: chat-app
 
 permissions:
   contents: read
-  statuses: write
 
 jobs:
-  ci-started:
-    name: CI started (trigger OK)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Commit status pending (Code tab yellow dot)
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha: context.sha,
-              state: 'pending',
-              context: 'ACR / Azure pipeline',
-              description: 'Pipeline running…',
-              target_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
-            });
-      - run: |
-          echo "Workflow triggered for ref=${{ github.ref }} sha=${{ github.sha }}"
-
   build-and-push:
-    name: Build and push image
-    needs: ci-started
     runs-on: ubuntu-latest
-    env:
-      IMAGE_NAME: ${{ toLower(github.event.repository.name) }}
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Require AZURE_CREDENTIALS secret
-        env:
-          HAS_CREDS: ${{ secrets.AZURE_CREDENTIALS != '' }}
-        run: |
-          if [ "$HAS_CREDS" != "true" ]; then
-            echo "::error::Repo secret AZURE_CREDENTIALS missing — Settings → Secrets and variables → Actions → New repository secret"
-            exit 1
-          fi
-
-      - name: Azure login (AZURE_CREDENTIALS JSON)
+      - name: Azure Login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Log in to Azure Container Registry (Docker)
-        run: az acr login --name ${{ env.ACR_NAME }}
-
-      - name: Docker image metadata (enterprise tagging)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.AZURE_CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=sha,prefix=,format=long
-            type=sha,prefix=sha-,format=short
-            type=raw,value=latest,enable={{is_default_branch}}
-          labels: |
-            org.opencontainers.image.title=${{ github.event.repository.name }}
-            org.opencontainers.image.url=${{ github.event.repository.html_url }}
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}.git
-            org.opencontainers.image.vendor=${{ github.repository_owner }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            com.github.workflow.run_id=${{ github.run_id }}
-            com.github.workflow.run_number=${{ github.run_number }}
-
-      - name: Build and push
-        id: push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ steps.meta.outputs.tags }}
-            ${{ env.AZURE_CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:ci-${{ github.run_number }}-${{ github.run_attempt }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Deploy reference (Argo / Helm - pin by digest)
+      - name: Set image tag
         run: |
-          {
-            echo "### Container image (enterprise)"
-            echo ""
-            echo "**Immutable digest (recommended in prod):**"
-            echo '```'
-            echo "${{ env.AZURE_CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
-            echo '```'
-            echo ""
-            echo "**Tags pushed this run:**"
-            echo '```'
-            echo "${{ steps.meta.outputs.tags }}"
-            echo "${{ env.AZURE_CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}:ci-${{ github.run_number }}-${{ github.run_attempt }}"
-            echo '```'
-            echo ""
-            echo "| Dimension | Value |"
-            echo "|-----------|--------|"
-            echo "| Registry | \`${{ env.AZURE_CONTAINER_REGISTRY }}\` |"
-            echo "| Repository | \`${{ env.IMAGE_NAME }}\` |"
-            echo "| Git SHA | \`${{ github.sha }}\` |"
-            echo "| Workflow run | [\`${{ github.run_id }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |"
-          } >> "$GITHUB_STEP_SUMMARY"
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "IMAGE_TAG=${BRANCH}-${SHORT_SHA}" >> "$GITHUB_ENV"
 
-  commit-status:
-    name: Final commit status
-    needs: [ci-started, build-and-push]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Commit status success or failure (Code tab icon)
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const ci = '${{ needs.ci-started.result }}';
-            const build = '${{ needs.build-and-push.result }}';
-            const ok = ci === 'success' && build === 'success';
-            await github.rest.repos.createCommitStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              sha: context.sha,
-              state: ok ? 'success' : 'failure',
-              context: 'ACR / Azure pipeline',
-              description: ok ? 'Image pushed to ACR' : 'Failed — open Actions for logs',
-              target_url: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
-            });
+      - name: Login to ACR
+        run: az acr login --name "$ACR_NAME"
+
+      - name: Build Docker image
+        run: |
+          echo "Building ${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}"
+          docker build -t "${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}" .
+
+      - name: Push Docker image
+        run: |
+          echo "Pushing image..."
+          docker push "${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}"
+
+      - name: Output image info
+        run: |
+          echo "Image pushed:"
+          echo "${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}"
