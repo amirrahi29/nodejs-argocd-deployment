@@ -1,4 +1,5 @@
 name: Build and push to Azure ACR
+run-name: ACR ${{ github.ref_name }} @ ${{ github.sha }}
 
 "on":
   push:
@@ -14,7 +15,17 @@ permissions:
   contents: read
 
 jobs:
+  ci-started:
+    name: CI started (trigger OK)
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Workflow triggered for ref=${{ github.ref }} sha=${{ github.sha }}"
+          echo "Yellow dot = ye job ya 'Build and push' abhi chal raha hai."
+
   build-and-push:
+    name: Build and push image
+    needs: ci-started
     runs-on: ubuntu-latest
     env:
       IMAGE_NAME: ${{ toLower(github.event.repository.name) }}
