@@ -1,4 +1,4 @@
-name: Build & Push Docker Image
+name: Build, push & Helm (per branch)
 
 on:
   push:
@@ -15,6 +15,7 @@ env:
   AZURE_SUBSCRIPTION_ID: dde8a869-f29f-41ae-90ea-0047779211e6
   AZURE_LOCATION: East US
   IMAGE_NAME: chat-app
+  HELM_CHART_DIR: ./helm/chat-app
 
 permissions:
   contents: read
@@ -31,9 +32,10 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Set image tag
+      - name: Set branch and image tag
         run: |
           BRANCH="${GITHUB_REF#refs/heads/}"
+          echo "BRANCH=${BRANCH}" >> "$GITHUB_ENV"
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "IMAGE_TAG=${BRANCH}-${SHORT_SHA}" >> "$GITHUB_ENV"
 
@@ -54,3 +56,50 @@ jobs:
         run: |
           echo "Image pushed:"
           echo "${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.4
+
+      - name: Helm template (validate chart + branch values)
+        run: |
+          test -f "${HELM_CHART_DIR}/values-${BRANCH}.yaml" || { echo "::error::Missing ${HELM_CHART_DIR}/values-${BRANCH}.yaml"; exit 1; }
+          helm template "chat-app-${BRANCH}" "${HELM_CHART_DIR}" \
+            -f "${HELM_CHART_DIR}/values.yaml" \
+            -f "${HELM_CHART_DIR}/values-${BRANCH}.yaml" \
+            --set-string image.repository="${ACR_LOGIN_SERVER}/${IMAGE_NAME}" \
+            --set-string image.tag="${IMAGE_TAG}"
+
+      - name: Install kubectl
+        if: ${{ vars.AKS_CLUSTER_NAME != '' }}
+        uses: azure/setup-kubectl@v4
+
+      - name: AKS credentials & ACR pull secret
+        if: ${{ vars.AKS_CLUSTER_NAME != '' }}
+        run: |
+          az aks get-credentials \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "${{ vars.AKS_CLUSTER_NAME }}" \
+            --overwrite-existing
+          kubectl create namespace "${BRANCH}" --dry-run=client -o yaml | kubectl apply -f -
+          TOKEN=$(az acr login --name "$ACR_NAME" --expose-token --query accessToken -o tsv)
+          kubectl delete secret acr-pull -n "${BRANCH}" --ignore-not-found
+          kubectl create secret docker-registry acr-pull \
+            --namespace "${BRANCH}" \
+            --docker-server="https://${ACR_LOGIN_SERVER}" \
+            --docker-username="00000000-0000-0000-0000-000000000000" \
+            --docker-password="$TOKEN"
+
+      - name: Helm upgrade --install (AKS)
+        if: ${{ vars.AKS_CLUSTER_NAME != '' }}
+        run: |
+          helm upgrade --install "chat-app-${BRANCH}" "${HELM_CHART_DIR}" \
+            -f "${HELM_CHART_DIR}/values.yaml" \
+            -f "${HELM_CHART_DIR}/values-${BRANCH}.yaml" \
+            --set-string image.repository="${ACR_LOGIN_SERVER}/${IMAGE_NAME}" \
+            --set-string image.tag="${IMAGE_TAG}" \
+            --set-json 'imagePullSecrets=[{"name":"acr-pull"}]' \
+            --namespace "${BRANCH}" \
+            --create-namespace \
+            --wait --timeout 5m
