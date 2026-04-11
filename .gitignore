@@ -18,5 +18,7 @@ docker-compose.override.yml
 tmp/
 temp/
 .cache/
+__pycache__/
+*.pyc
 .env.local
 .env.*.local
