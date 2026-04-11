@@ -6,7 +6,7 @@ const PORT = process.env.PORT || 3000;
 app.get("/", (req, res) => {
   res.type("html").send(`<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8"><title>Welcome</title></head>
+<head><meta charset="utf-8"><title>Welcome dev branch</title></head>
 <body>
   <h1>Welcome! dev branch</h1>
   <p><a href="/data">GET /data</a> — JSON response</p>
