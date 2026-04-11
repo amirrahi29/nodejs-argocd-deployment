@@ -2,4 +2,4 @@ env:
   NODE_ENV: development
 image:
   repository: rahicontaineregistry.azurecr.io/chat-app
-  tag: dev-fc53805
+  tag: dev-96058e0
