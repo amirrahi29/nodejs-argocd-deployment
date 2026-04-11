@@ -1,5 +1,6 @@
 replicaCount: 1
 image:
-  tag: dev-latest
+  tag: dev-480fb11
+  repository: rahicontaineregistry.azurecr.io/chat-app
 env:
   NODE_ENV: development
