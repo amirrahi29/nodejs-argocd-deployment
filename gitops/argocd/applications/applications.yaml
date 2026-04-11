@@ -11,7 +11,7 @@ spec:
     repoURL: https://github.com/amirrahi29/nodejs-argocd-deployment.git
     targetRevision: dev
     path: gitops/helm/chat-app
-    helm:
+    helm: 
       valueFiles:
         - values.yaml
         - values-dev.yaml
