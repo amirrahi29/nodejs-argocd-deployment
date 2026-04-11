@@ -2,4 +2,4 @@ env:
   NODE_ENV: staging
 image:
   repository: rahicontaineregistry.azurecr.io/chat-app
-  tag: staging-7e2c4f4
+  tag: staging-5cca439
