@@ -39,7 +39,7 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: azure/login@v2
+      - uses: azure/login@v3
         if: steps.gate.outputs.skip == 'false'
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}

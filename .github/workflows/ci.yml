@@ -88,7 +88,7 @@ jobs:
       - name: Load config/project.yaml
         run: python3 scripts/apply-project-config.py --github-env >> "$GITHUB_ENV"
 
-      - uses: azure/login@v2
+      - uses: azure/login@v3
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
