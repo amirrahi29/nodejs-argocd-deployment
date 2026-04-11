@@ -13,7 +13,7 @@ app.get("/", (req, res) => {
 <html lang="en">
 <head><meta charset="utf-8"><title>Welcome — ${deployEnv}</title></head>
 <body>
-  <h1>Welcome — ${deployEnv}.... main branch</h1>
+  <h1>Welcome — ${deployEnv} main branch</h1>
   <p><a href="/data">GET /data</a> — JSON response</p>
 </body> 
 </html>`);
