@@ -1,11 +1,10 @@
-name: App — build, push ACR, bump GitOps image tag
+name: Build and push image (ACR + GitOps tag)
 
 on:
   push:
     branches: [main, dev, staging, uat]
-    paths:
-      - "app/**"
-      - ".github/workflows/app-build-push.yml"
+    paths-ignore:
+      - "gitops/**"
   workflow_dispatch:
 
 permissions:
@@ -30,7 +29,7 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Azure subscription + ACR check
+      - name: Azure subscription and ACR
         run: |
           set -euo pipefail
           SUB="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
@@ -38,14 +37,14 @@ jobs:
           az account show -o table
           az acr show -n "$ACR_NAME" --query "{name:name,loginServer:loginServer}" -o table
 
-      - name: Branch & image tag
+      - name: Branch and image tag
         run: |
           echo "BRANCH=${GITHUB_REF#refs/heads/}" >> "$GITHUB_ENV"
           echo "IMAGE_TAG=${GITHUB_REF#refs/heads/}-$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
 
       - run: az acr login --name "$ACR_NAME"
 
-      - name: Docker build & push
+      - name: Docker build and push
         run: |
           docker build -t "${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}" ./app
           docker push "${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
@@ -56,7 +55,7 @@ jobs:
 
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml
 
-      - name: Bump GitOps image (values-${BRANCH}.yaml)
+      - name: Update Helm values image tag
         run: |
           python3 <<'PY'
           import os, pathlib, yaml
@@ -69,14 +68,14 @@ jobs:
           p.write_text(yaml.dump(d, default_flow_style=False, sort_keys=False))
           PY
 
-      - name: helm template
+      - name: Helm template validate
         run: |
           f="${GITOPS_CHART_DIR}/values-${BRANCH}.yaml"
           test -f "$f" || { echo "::error::Missing $f"; exit 1; }
           helm template "chat-app-${BRANCH}" "${GITOPS_CHART_DIR}" \
             -f "${GITOPS_CHART_DIR}/values.yaml" -f "$f"
 
-      - name: Commit GitOps (pull --rebase + push with retries)
+      - name: Commit and push values (rebase retries)
         run: |
           set -euo pipefail
           BR="${GITHUB_REF_NAME}"
@@ -84,11 +83,10 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "${GITOPS_CHART_DIR}/values-${BRANCH}.yaml"
           git diff --staged --quiet && exit 0
-          git commit -m "chore(gitops): bump ${IMAGE_NAME} to ${IMAGE_TAG} [skip ci]"
+          git commit -m "chore(gitops): bump ${IMAGE_NAME} ${IMAGE_TAG}"
           for i in 1 2 3 4 5; do
             git pull --rebase origin "$BR" && git push origin "$BR" && exit 0
-            echo "::warning::Push attempt $i failed, retrying after rebase..."
+            echo "::warning::retry $i"
             sleep $((i * 4))
           done
-          echo "::error::Could not push after retries."
           exit 1

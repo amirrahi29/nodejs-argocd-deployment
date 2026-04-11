@@ -1,5 +1,4 @@
-# Apply: kubectl apply -n argocd -f gitops/argocd/applications/applicationset.yaml
-# Pehle chaar purane Application CRs delete karo (agar the): chat-app-dev main staging uat
+# kubectl apply -n argocd -f gitops/argocd/applications/applicationset.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
