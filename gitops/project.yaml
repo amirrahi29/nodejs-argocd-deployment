@@ -1,12 +1,10 @@
-# This repo is maintained on branch: staging (default integration branch for CI cluster sync + platform app).
-# Single source of truth for GitOps + CI. Edit values, then run:
-#   python3 gitops/apply-project-config.py --sync-files
-#   python3 gitops/apply-project-config.py --helm-all   # optional: validate all overlays
+# Default Git branch for platform + Argo root manifests: main (see .github/workflows/ci.yml).
+# Environments: Helm overlays gitops/helm/chat-app/values-<env>.yaml + ApplicationSet (targetRevision per env).
+# After edits, on main you can run: python3 gitops/apply-project-config.py --sync-files
 
 git:
   repo_url: https://github.com/amirrahi29/nodejs-argocd-deployment.git
-  # Argo "argocd-platform" Application tracks this revision (must match your primary branch).
-  platform_branch: staging
+  platform_branch: main
   platform_path: gitops/argocd/platform
 
 azure:

@@ -1,11 +1,13 @@
-# Primary integration branch for GitOps + cluster sync: staging (see gitops/project.yaml → git.platform_branch).
+# Best practice: default branch `main` is the single source for Argo root manifests + platform revision.
+# Cluster kubectl apply runs only on `main` when GitOps / workflow / project config changes (or manual).
+# Environments use Helm overlays (values-*.yaml) + ApplicationSet; other branches build/push without applying.
 name: Application delivery pipeline
 
 run-name: "${{ github.ref_name }} · ${{ github.event_name }}"
 
 on:
   push:
-    branches: [staging, dev, main, uat]
+    branches: [main, dev, staging, uat]
   pull_request:
   workflow_dispatch:
 
@@ -25,6 +27,7 @@ jobs:
       app: ${{ steps.filter.outputs.app }}
       gitops: ${{ steps.filter.outputs.gitops }}
       project_config: ${{ steps.filter.outputs.project_config }}
+      workflow: ${{ steps.filter.outputs.workflow }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -41,6 +44,8 @@ jobs:
             project_config:
               - 'gitops/project.yaml'
               - 'gitops/apply-project-config.py'
+            workflow:
+              - '.github/workflows/**'
 
   audit:
     name: Security — Node.js dependency audit
@@ -71,7 +76,10 @@ jobs:
   render:
     name: GitOps — render manifests from project config
     needs: changes
-    if: github.event_name == 'push' && needs.changes.outputs.project_config == 'true'
+    if: |
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.project_config == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -113,6 +121,11 @@ jobs:
   helm:
     name: Validate — Helm chart (all environments)
     needs: changes
+    if: |
+      github.event_name == 'pull_request' ||
+      needs.changes.outputs.gitops == 'true' ||
+      needs.changes.outputs.project_config == 'true' ||
+      needs.changes.outputs.workflow == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -216,9 +229,18 @@ jobs:
 
   argocd-apply:
     name: Cluster — sync Argo CD application manifests
+    needs: changes
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/staging')
+      (
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
+        (
+          needs.changes.outputs.gitops == 'true' ||
+          needs.changes.outputs.project_config == 'true' ||
+          needs.changes.outputs.workflow == 'true'
+        )
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
@@ -277,8 +299,8 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         run: kubectl apply -n argocd -f gitops/argocd/applications/
 
-  verify-deployed:
-    name: Cluster — verify health & optional rollback
+  verify-main:
+    name: Production — verify health & automatic rollback
     needs: [changes, build, argocd-apply]
     if: |
       always() &&
@@ -286,11 +308,7 @@ jobs:
       (needs.build.result == 'success' || needs.build.result == 'skipped') &&
       (
         github.event_name == 'workflow_dispatch' ||
-        (
-          github.event_name == 'push' &&
-          github.ref == 'refs/heads/staging' &&
-          (needs.changes.outputs.app == 'true' || needs.changes.outputs.gitops == 'true')
-        )
+        (github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.app == 'true' || needs.changes.outputs.gitops == 'true'))
       )
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -311,18 +329,10 @@ jobs:
         run: |
           if [ -z "${AKS_CLUSTER_NAME:-}" ] || [ -z "${AKS_RESOURCE_GROUP:-}" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::Skipping deploy verify — no AKS in gitops/project.yaml."
+            echo "::notice::Skipping production verify — no AKS in gitops/project.yaml."
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Set verify targets from branch
-        if: steps.gate.outputs.skip == 'false'
-        run: |
-          BR="${GITHUB_REF_NAME}"
-          echo "VERIFY_NAMESPACE=${BR}" >> "$GITHUB_ENV"
-          echo "VERIFY_ARGO_APP=${ARGO_APP_PREFIX}-${BR}" >> "$GITHUB_ENV"
-          echo "VERIFY_DEPLOYMENT=${ARGO_APP_PREFIX}-${BR}-${HELM_CHART_NAME}" >> "$GITHUB_ENV"
 
       - name: Sign in to Azure (service principal from project.yaml)
         if: ${{ steps.gate.outputs.skip == 'false' && env.AZURE_CLIENT_ID != '' && env.AZURE_TENANT_ID != '' && env.AZURE_SUBSCRIPTION_ID != '' }}
