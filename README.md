@@ -16,7 +16,7 @@ Express + Helm + Argo CD (one Git branch per env: `dev` / `main` / `staging` / `
 
 ## Ops (short)
 
-- **Auto:** push → CI builds & bumps image on `app/**`; `helm template` on `gitops/**` or `scripts/**`; on `main`, `argocd-cluster-sync` applies `gitops/argocd/applications/` if Variables **`AKS_RESOURCE_GROUP`** + **`AKS_CLUSTER_NAME`** are set; Argo auto-syncs apps. Optional **`AKS_USE_ADMIN_KUBECONFIG=true`** if `get-credentials` fails.
+- **Auto:** every push/PR runs **`helm template`** on all overlays; build + image bump only when `app/**` or workflow files change; on `main`, `argocd-cluster-sync` applies `gitops/argocd/applications/` if **`AKS_RESOURCE_GROUP`** + **`AKS_CLUSTER_NAME`** are set. Optional **`AKS_USE_ADMIN_KUBECONFIG=true`** if `get-credentials` fails.
 - **One-time:** Azure + AKS + Argo on cluster; GitHub secret **`AZURE_CREDENTIALS`** (optional **`AZURE_SUBSCRIPTION_ID`**).
 - **Rollback:** `git revert` + push (auto-sync), or Argo **History → Rollback** (temporary if auto-sync on), or `kubectl rollout undo` (emergency).
 - **Hardening (portal):** protect `main`, OIDC to Azure instead of long-lived SP, Ingress+TLS for Argo, Key Vault for app secrets.
