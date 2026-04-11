@@ -38,6 +38,16 @@ git config pull.rebase true
 git config fetch.prune true
 ```
 
+## Argo CD UI on LoadBalancer (GitOps)
+
+Manifests live under `gitops/argocd/platform/` (`argocd-server` → `type: LoadBalancer`). One-time bootstrap so Argo syncs that folder from `main`:
+
+```bash
+kubectl apply -n argocd -f gitops/argocd/applications/argocd-platform-application.yaml
+```
+
+Then `kubectl get svc argocd-server -n argocd` for the external IP and open `https://<IP>`. If Argo was installed with Helm and labels differ, adjust the `Service` `selector` to match your install.
+
 ## CI
 
 `.github/workflows/ci.yml`: GitOps-only changes run `helm template` on all overlays; app (or workflow) changes build, push to ACR, patch `values-<branch>.yaml`, then commit with `git pull --rebase` retries.

@@ -1,0 +1,22 @@
+# Bootstrap once (then Argo keeps the Service in sync from Git):
+#   kubectl apply -n argocd -f gitops/argocd/applications/argocd-platform-application.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-platform
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: argocd-gitops
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/amirrahi29/nodejs-argocd-deployment.git
+    targetRevision: main
+    path: gitops/argocd/platform
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
