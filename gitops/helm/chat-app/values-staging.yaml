@@ -1,5 +1,6 @@
 replicaCount: 1
 image:
+  repository: rahicontaineregistry.azurecr.io/chat-app
   tag: staging-latest
 env:
   NODE_ENV: staging
