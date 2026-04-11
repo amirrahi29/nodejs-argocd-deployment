@@ -4,12 +4,11 @@ on:
   push:
     branches:
       - main
-      - dev
-      - uat
-      - staging
     paths:
       - "app/**"
       - ".github/workflows/app-build-push.yml"
+  # Dev / uat / staging image: Actions → this workflow → Run workflow → woh branch select karo
+  workflow_dispatch:
 
 permissions:
   contents: write
