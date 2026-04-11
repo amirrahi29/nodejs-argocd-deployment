@@ -1,6 +1,6 @@
 # nodejs-argocd-deployment
 
-Node app (`app/`), Helm chart (`gitops/helm/chat-app`), Argo CD ApplicationSet (`gitops/argocd/`).
+Node app (`app/`), Helm chart (`gitops/helm/chat-app`), Argo CD ApplicationSet (`gitops/argocd/`). For a production-style checklist (branch protection, OIDC, Ingress, secrets), see [docs/industry-alignment.md](docs/industry-alignment.md).
 
 ## Branches and environments
 
