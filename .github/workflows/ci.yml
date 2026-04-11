@@ -97,7 +97,8 @@ jobs:
           BR="${GITHUB_REF_NAME}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add gitops/argocd/applications/applicationset.yaml \
+          git add gitops/argocd/applications/00-appprojects.yaml \
+            gitops/argocd/applications/applicationset.yaml \
             gitops/argocd/applications/argocd-platform-application.yaml \
             "${CHART}/values.yaml"
           git diff --staged --quiet && exit 0

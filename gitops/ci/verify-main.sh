@@ -3,8 +3,10 @@
 set -euo pipefail
 
 NS_APP="${VERIFY_NAMESPACE:-main}"
-DEPLOY="${VERIFY_DEPLOYMENT:-chat-app-main-chat-app}"
-ARGO_APP="${VERIFY_ARGO_APP:-chat-app-main}"
+P="${ARGO_APP_PREFIX:-chat-app}"
+C="${HELM_CHART_NAME:-chat-app}"
+DEPLOY="${VERIFY_DEPLOYMENT:-${P}-main-${C}}"
+ARGO_APP="${VERIFY_ARGO_APP:-${P}-main}"
 ARGO_NS="${VERIFY_ARGO_NS:-argocd}"
 ROLLOUT_TIMEOUT="${VERIFY_ROLLOUT_TIMEOUT:-5m}"
 ARGO_WAIT_SEC="${VERIFY_ARGO_WAIT_SEC:-600}"

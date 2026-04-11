@@ -4,9 +4,9 @@ metadata:
   name: argocd-platform
   namespace: argocd
   labels:
-    app.kubernetes.io/part-of: argocd-gitops
+    app.kubernetes.io/part-of: chat-app-gitops
 spec:
-  project: default
+  project: chat-app-platform
   source:
     repoURL: https://github.com/amirrahi29/nodejs-argocd-deployment.git
     targetRevision: main

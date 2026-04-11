@@ -1,6 +1,7 @@
 git:
   repo_url: https://github.com/amirrahi29/nodejs-argocd-deployment.git
   platform_branch: main
+  platform_path: gitops/argocd/platform
 
 azure:
   acr_name: rahicontaineregistry
@@ -15,6 +16,9 @@ app:
 helm:
   chart_path: gitops/helm/chat-app
   version: v3.14.4
+
+argocd:
+  app_prefix: chat-app
 
 aks:
   resource_group: RahiResource

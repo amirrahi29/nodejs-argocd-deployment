@@ -9,8 +9,8 @@ Express + Helm + Argo CD (branches: `dev`, `main`, `staging`, `uat`).
 | `app/` | Image source |
 | `gitops/helm/chat-app` | Chart + `values-<env>.yaml` |
 | `gitops/argocd/` | ApplicationSet, platform app, `argocd-server` Service |
-| `gitops/project.yaml` | Git URL, Azure (ACR + optional SP ids), image, Helm, AKS |
-| `gitops/apply-project-config.py` | CI + local: env export, Argo/values sync, Helm template, image patch |
+| `gitops/project.yaml` | Single source: Git URLs/paths, Azure, Helm, **Argo** (`argocd.app_prefix`, optional `environments`), AKS |
+| `gitops/apply-project-config.py` | Exports env; **`--sync-files`** (re)writes `00-appprojects.yaml`, `applicationset.yaml`, platform `Application`, base `values.yaml` from `project.yaml` + chart `values-*.yaml` |
 | `gitops/ci/verify-main.sh` | **main** production checks (rollout, Argo health, `/healthz`); optional Argo rollback |
 | `.github/workflows/ci.yml` | **Application delivery pipeline** — audit, Helm validation, optional build/publish, GitOps commits, Argo CD apply (Azure: `project.yaml` SP + `AZURE_CLIENT_SECRET`, or `AZURE_CREDENTIALS`) |
 
