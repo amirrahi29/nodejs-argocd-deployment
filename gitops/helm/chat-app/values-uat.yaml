@@ -1,0 +1,5 @@
+replicaCount: 1
+image:
+  tag: uat-latest
+env:
+  NODE_ENV: uat

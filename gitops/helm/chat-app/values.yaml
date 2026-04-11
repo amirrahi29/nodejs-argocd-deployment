@@ -1,0 +1,15 @@
+replicaCount: 1
+
+image:
+  repository: rahicontaineregistry.azurecr.io/chat-app
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+service:
+  type: ClusterIP
+  port: 3000
+
+env:
+  NODE_ENV: production
