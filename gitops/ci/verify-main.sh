@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Post-deploy: rollout + Argo health + in-cluster /healthz; Argo rollback if checks fail.
+# Defaults target the main env; override with VERIFY_NAMESPACE, VERIFY_ARGO_APP, VERIFY_DEPLOYMENT.
 set -euo pipefail
 
 NS_APP="${VERIFY_NAMESPACE:-main}"
@@ -124,4 +125,4 @@ fi
 echo "Smoke Job succeeded."
 
 kubectl delete job -n "$NS_APP" "$SMOKE_JOB" --ignore-not-found || true
-echo "Production verify OK (rollout + Argo + smoke)."
+echo "Deploy verify OK (rollout + Argo + smoke)."

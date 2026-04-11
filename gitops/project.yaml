@@ -1,3 +1,7 @@
+# Default Git branch for platform + Argo root manifests: main (see .github/workflows/ci.yml).
+# Environments: Helm overlays gitops/helm/chat-app/values-<env>.yaml + ApplicationSet (targetRevision per env).
+# After edits, on main you can run: python3 gitops/apply-project-config.py --sync-files
+
 git:
   repo_url: https://github.com/amirrahi29/nodejs-argocd-deployment.git
   platform_branch: main

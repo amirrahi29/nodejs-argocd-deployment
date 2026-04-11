@@ -1,3 +1,6 @@
+# Best practice: default branch `main` is the single source for Argo root manifests + platform revision.
+# Cluster kubectl apply runs only on `main` when GitOps / workflow / project config changes (or manual).
+# Environments use Helm overlays (values-*.yaml) + ApplicationSet; other branches build/push without applying.
 name: Application delivery pipeline
 
 run-name: "${{ github.ref_name }} · ${{ github.event_name }}"
@@ -24,6 +27,7 @@ jobs:
       app: ${{ steps.filter.outputs.app }}
       gitops: ${{ steps.filter.outputs.gitops }}
       project_config: ${{ steps.filter.outputs.project_config }}
+      workflow: ${{ steps.filter.outputs.workflow }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,6 +44,8 @@ jobs:
             project_config:
               - 'gitops/project.yaml'
               - 'gitops/apply-project-config.py'
+            workflow:
+              - '.github/workflows/**'
 
   audit:
     name: Security — Node.js dependency audit
@@ -70,7 +76,10 @@ jobs:
   render:
     name: GitOps — render manifests from project config
     needs: changes
-    if: github.event_name == 'push' && needs.changes.outputs.project_config == 'true'
+    if: |
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.project_config == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -112,6 +121,11 @@ jobs:
   helm:
     name: Validate — Helm chart (all environments)
     needs: changes
+    if: |
+      github.event_name == 'pull_request' ||
+      needs.changes.outputs.gitops == 'true' ||
+      needs.changes.outputs.project_config == 'true' ||
+      needs.changes.outputs.workflow == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -215,7 +229,18 @@ jobs:
 
   argocd-apply:
     name: Cluster — sync Argo CD application manifests
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    needs: changes
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
+        (
+          needs.changes.outputs.gitops == 'true' ||
+          needs.changes.outputs.project_config == 'true' ||
+          needs.changes.outputs.workflow == 'true'
+        )
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
