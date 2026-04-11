@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""config/project.yaml → GITHUB_ENV lines and/or patch repo URLs & image in tracked YAML (no full re-dump)."""
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import re
+import subprocess
 import sys
 
 import yaml
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-CFG_PATH = ROOT / "config" / "project.yaml"
+CFG_PATH = ROOT / "gitops" / "project.yaml"
 
 
 def load_cfg() -> dict:
@@ -32,6 +33,15 @@ def github_env_lines(c: dict) -> str:
         f"CHART={h['chart_path']}",
         f"HELM_VERSION={h['version']}",
     ]
+    tid, sid, cid = az.get("tenant_id"), az.get("subscription_id"), az.get("client_id")
+    if tid and sid and cid:
+        lines.extend(
+            [
+                f"AZURE_TENANT_ID={tid}",
+                f"AZURE_SUBSCRIPTION_ID={sid}",
+                f"AZURE_CLIENT_ID={cid}",
+            ]
+        )
     aks = c.get("aks") or {}
     rg, cn = aks.get("resource_group"), aks.get("cluster_name")
     if rg and cn:
@@ -75,18 +85,98 @@ def sync_files(c: dict) -> None:
     values.write_text(yaml.dump(dv, default_flow_style=False, sort_keys=False))
 
 
+def _chart_dir(c: dict | None = None) -> pathlib.Path:
+    c = c or load_cfg()
+    p = ROOT / c["helm"]["chart_path"]
+    if not p.is_dir():
+        print(f"::error::Missing chart dir {p}", file=sys.stderr)
+        sys.exit(1)
+    return p
+
+
+def helm_template_all() -> None:
+    chart = _chart_dir()
+    for f in sorted(chart.glob("values-*.yaml")):
+        if f.name == "values.yaml":
+            continue
+        env = f.stem.removeprefix("values-")
+        subprocess.run(
+            [
+                "helm",
+                "template",
+                f"chat-app-{env}",
+                str(chart),
+                "-f",
+                str(chart / "values.yaml"),
+                "-f",
+                str(f),
+            ],
+            check=True,
+        )
+
+
+def helm_template_branch(branch: str) -> None:
+    chart = _chart_dir()
+    overlay = chart / f"values-{branch}.yaml"
+    if not overlay.is_file():
+        print(f"::error::Missing {overlay}", file=sys.stderr)
+        sys.exit(1)
+    subprocess.run(
+        [
+            "helm",
+            "template",
+            f"chat-app-{branch}",
+            str(chart),
+            "-f",
+            str(chart / "values.yaml"),
+            "-f",
+            str(overlay),
+        ],
+        check=True,
+    )
+
+
+def patch_values_image() -> None:
+    b, tag = os.environ["BRANCH"], os.environ["IMAGE_TAG"]
+    repo = f'{os.environ["ACR_LOGIN_SERVER"]}/{os.environ["IMAGE_NAME"]}'
+    chart = ROOT / os.environ["CHART"]
+    p = chart / f"values-{b}.yaml"
+    data = yaml.safe_load(p.read_text()) or {}
+    data.setdefault("image", {})
+    data["image"]["repository"] = repo
+    data["image"]["tag"] = tag
+    p.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
+
+
 def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__)
+    ap = argparse.ArgumentParser()
     ap.add_argument("--github-env", action="store_true")
     ap.add_argument("--sync-files", action="store_true")
+    ap.add_argument("--helm-all", action="store_true")
+    ap.add_argument("--helm-branch", metavar="BRANCH")
+    ap.add_argument("--patch-values-image", action="store_true")
     args = ap.parse_args()
-    if not args.github_env and not args.sync_files:
-        ap.error("pass --github-env and/or --sync-files")
+    if not any(
+        [
+            args.github_env,
+            args.sync_files,
+            args.helm_all,
+            args.helm_branch,
+            args.patch_values_image,
+        ]
+    ):
+        ap.error("pass at least one action flag")
     c = load_cfg()
     if args.github_env:
         sys.stdout.write(github_env_lines(c))
     if args.sync_files:
         sync_files(c)
+    if args.helm_all:
+        helm_template_all()
+    if args.helm_branch:
+        helm_template_branch(args.helm_branch)
+    if args.patch_values_image:
+        patch_values_image()
 
 
 if __name__ == "__main__":

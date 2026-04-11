@@ -1,6 +1,6 @@
 # nodejs-argocd-deployment
 
-Express + Helm + Argo CD (one Git branch per env: `dev` / `main` / `staging` / `uat`).
+Express + Helm + Argo CD (branches: `dev`, `main`, `staging`, `uat`).
 
 ## Layout
 
@@ -9,51 +9,49 @@ Express + Helm + Argo CD (one Git branch per env: `dev` / `main` / `staging` / `
 | `app/` | Image source |
 | `gitops/helm/chat-app` | Chart + `values-<env>.yaml` |
 | `gitops/argocd/` | ApplicationSet, platform app, `argocd-server` Service |
-| `config/project.yaml` | **Single file:** Git URL, ACR, image name, Helm chart path, versions |
-| `scripts/apply-project-config.py` | CI reads env from it; `--sync-files` patches Argo + `values.yaml` |
+| `gitops/project.yaml` | Git URL, Azure (ACR + optional SP ids), image, Helm, AKS |
+| `scripts/apply-project-config.py` | `--github-env`, `--sync-files`, `--helm-all`, `--helm-branch`, `--patch-values-image` |
 | `scripts/helpers.sh` | `push` \| `argocd-wait` |
-| `scripts/helm-template-overlays.sh` | `helm template` all overlays or one branch |
+| `.github/workflows/ci.yml` | CI, build, Helm, GitOps commits, `argocd-apply` (Azure login: `project.yaml` SP + `AZURE_CLIENT_SECRET`, or `AZURE_CREDENTIALS`) |
 
-**New project / fork:** edit **`config/project.yaml`** only, then:
+**Fork / retarget:** edit `gitops/project.yaml` and push; CI `render` runs `--sync-files` when that file or the script changes.
 
 ```bash
-pip3 install pyyaml   # or: brew install libyaml && … ; CI has python3-yaml
+pip3 install pyyaml
 python3 scripts/apply-project-config.py --sync-files
-git diff   # review updates to Argo manifests + values.yaml default image
-git commit -am "chore: apply project config"
+git diff && git commit …
 ```
 
-CI reads **`config/project.yaml`** at runtime (`--github-env`), so ACR/build use it without re-running sync — but Argo YAML in Git must match (run `--sync-files` before push). **AKS** `resource_group` / `cluster_name` are in the same file under **`aks:`** (cluster sync skips if that block is empty).
+## Azure auth (pick one)
 
-## Ops (short)
+**A — Single secret (legacy):** leave `azure.tenant_id`, `subscription_id`, `client_id` empty in `project.yaml`. GitHub secret **`AZURE_CREDENTIALS`**: full service principal JSON from `az ad sp create-for-rbac --sdk-auth`.
 
-- **Auto:** every push/PR runs **`helm template`**; build + image bump when `app/**` or workflow changes; on `main`, `argocd-cluster-sync` applies Argo apps when **`config/project.yaml`** has **`aks.resource_group`** + **`aks.cluster_name`**. Optional **`aks.use_admin_kubeconfig: true`**.
-- **One-time (cannot live in Git):** Argo installed on cluster; GitHub secrets **`AZURE_CREDENTIALS`** (optional **`AZURE_SUBSCRIPTION_ID`**). **`CODEOWNERS` / `SECURITY.md`** mein apna handle/repo URL ek baar.
-- **Rollback:** `git revert` + push (auto-sync), or Argo **History → Rollback** (temporary if auto-sync on), or `kubectl rollout undo` (emergency).
-- **Hardening (portal):** protect `main`, OIDC to Azure instead of long-lived SP, Ingress+TLS for Argo, Key Vault for app secrets.
+**B — Split (recommended):** set **`azure.tenant_id`**, **`azure.subscription_id`**, **`azure.client_id`** in `gitops/project.yaml`. GitHub secret **`AZURE_CLIENT_SECRET`** only (same SP’s password). `AZURE_CREDENTIALS` not required.
+
+## Ops
+
+- **App rollout (image / Helm values):** Push → build updates `values-*.yaml` → Argo CD **auto-syncs from Git** — no `kubectl` per deploy.
+- **Argo Application / ApplicationSet YAML:** On **every push to `main`** (and `workflow_dispatch`), CI job `argocd-apply` runs `kubectl apply -n argocd -f gitops/argocd/applications/` when `aks` is set in `gitops/project.yaml` — idempotent, no manual step in normal use.
+- Push/PR: `helm template` validation; build when `app/**` or workflow paths change. Optional `aks.use_admin_kubeconfig: true`.
+- One-time: install Argo CD on the cluster once; GitHub secrets as above. Manual `kubectl apply` only if CI is skipped (e.g. `aks` empty) or first bootstrap before Actions is wired.
+- Rollback: `git revert` + push, Argo history, or `kubectl rollout undo`.
+- Production: branch protection, GitHub→Azure OIDC (no long-lived SP password), Argo Ingress + SSO, Key Vault.
 
 ## Commands
 
 ```bash
-chmod +x scripts/helpers.sh   # once
+chmod +x scripts/helpers.sh
 ./scripts/helpers.sh push
 ./scripts/helpers.sh argocd-wait
-bash scripts/helm-template-overlays.sh gitops/helm/chat-app
+python3 scripts/apply-project-config.py --helm-all
 ```
-
-If **`aks:`** empty: `kubectl apply -n argocd -f gitops/argocd/applications/` manually once if needed.
 
 ## CI
 
-`ci.yml` — path filters, **`npm audit`** (high+) on PRs / app changes, **`helm template`** every run, Docker build when `app/**` or workflow changes; `argocd-cluster-sync.yml` — apply Argo apps to AKS from `main`. PR concurrency cancels superseded runs.
+`ci.yml`: path filters, `npm audit`, Helm, Docker build, GitOps commits, and **`argocd-apply` on each `main` push** (AKS + secrets configured) to keep Argo app manifests applied automatically.
 
-## Enterprise / governance
+## Security
 
-| Item | Location |
-|------|----------|
-| Vulnerability reporting | [SECURITY.md](SECURITY.md) |
-| Default reviewers | [.github/CODEOWNERS](.github/CODEOWNERS) |
-| Dependency & Actions updates | [.github/dependabot.yml](.github/dependabot.yml) |
-| PR checklist | [.github/pull_request_template.md](.github/pull_request_template.md) |
+Vulnerability reporting: [SECURITY.md](SECURITY.md).
 
-**Runtime:** non-root pod, read-only root FS, dropped capabilities, `seccompProfile: RuntimeDefault`, `/healthz` for probes, default **requests/limits** in `values.yaml`. Next steps in production: branch protection, GitHub → Azure **OIDC**, Argo **Ingress + SSO**, **Key Vault** for secrets.
+Runtime: non-root pod, read-only root FS, dropped capabilities, `seccompProfile: RuntimeDefault`, `/healthz`, requests/limits in `values.yaml`.

@@ -10,6 +10,5 @@ Include steps to reproduce, affected versions or branches, and impact if known.
 
 - Container runs as non-root (`USER node`), read-only root filesystem with `/tmp` emptyDir, dropped capabilities, `seccompProfile: RuntimeDefault`.
 - CI runs `npm audit` at **high** severity on app changes and pull requests.
-- Dependabot opens weekly PRs for `npm` and GitHub Actions.
 
-Rotate **`AZURE_CREDENTIALS`** and Argo admin access regularly; prefer OIDC federation for Azure in production.
+Rotate **`AZURE_CLIENT_SECRET`** or **`AZURE_CREDENTIALS`** and Argo admin access regularly; prefer GitHub→Azure OIDC in production (no SP password in GitHub).
