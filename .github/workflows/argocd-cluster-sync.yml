@@ -50,7 +50,7 @@ jobs:
           SUB="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
           [ -z "$SUB" ] || az account set --subscription "$SUB"
 
-      - uses: azure/setup-kubectl@v4
+      - uses: azure/setup-kubectl@v5
         if: steps.gate.outputs.skip == 'false'
 
       - name: Kubeconfig (AKS)
