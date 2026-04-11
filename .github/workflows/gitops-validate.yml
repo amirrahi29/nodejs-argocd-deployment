@@ -2,11 +2,7 @@ name: GitOps — Helm template validate
 
 on:
   push:
-    branches:
-      - main
-      - dev
-      - uat
-      - staging
+    branches: [main, dev, uat, staging]
     paths:
       - "gitops/**"
       - ".github/workflows/gitops-validate.yml"

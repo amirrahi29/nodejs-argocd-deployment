@@ -1,5 +1,2 @@
-replicaCount: 1
-image:
-  tag: staging-latest
 env:
   NODE_ENV: staging

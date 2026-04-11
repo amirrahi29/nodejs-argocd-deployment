@@ -2,19 +2,16 @@ name: App — build, push ACR, bump GitOps image tag
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - "app/**"
       - ".github/workflows/app-build-push.yml"
-  # Dev / uat / staging image: Actions → this workflow → Run workflow → woh branch select karo
   workflow_dispatch:
 
 permissions:
   contents: write
 
 env:
-  # Must match Portal → ACR → Login server (this registry is rahicontaineregistry, not ...container...)
   ACR_NAME: rahicontaineregistry
   ACR_LOGIN_SERVER: rahicontaineregistry.azurecr.io
   IMAGE_NAME: chat-app
@@ -28,85 +25,61 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Azure Login
-        uses: azure/login@v2
+      - uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Select subscription & verify ACR
+      - name: Azure subscription + ACR check
         run: |
           set -euo pipefail
           SUB="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-          if [ -n "$SUB" ]; then
-            echo "Using AZURE_SUBSCRIPTION_ID for subscription context."
-            az account set --subscription "$SUB"
-          else
-            echo "::notice::No AZURE_SUBSCRIPTION_ID secret — using subscription from AZURE_CREDENTIALS. If ACR lives in another subscription, add that secret (ACR → Overview → Subscription ID)."
-          fi
-          az account show --output table
-          if ! az acr show -n "$ACR_NAME" --query "{name:name,loginServer:loginServer}" -o table; then
-            echo "::error::ACR '$ACR_NAME' is not in the active subscription (see table above)."
-            echo "Usually: ACR is in a different subscription than service principal default."
-            echo "Fix: GitHub → Settings → Secrets → add AZURE_SUBSCRIPTION_ID = (Portal: ACR → Overview → Subscription ID)."
-            echo "Then: Entra ID → your app registration → assign Acr Push on that registry (scope: registry or RG)."
-            exit 1
-          fi
+          [ -z "$SUB" ] || az account set --subscription "$SUB"
+          az account show -o table
+          az acr show -n "$ACR_NAME" --query "{name:name,loginServer:loginServer}" -o table
 
-      - name: Set branch and image tag
+      - name: Branch & image tag
         run: |
-          BRANCH="${GITHUB_REF#refs/heads/}"
-          echo "BRANCH=${BRANCH}" >> "$GITHUB_ENV"
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          echo "IMAGE_TAG=${BRANCH}-${SHORT_SHA}" >> "$GITHUB_ENV"
+          echo "BRANCH=${GITHUB_REF#refs/heads/}" >> "$GITHUB_ENV"
+          echo "IMAGE_TAG=${GITHUB_REF#refs/heads/}-$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
 
-      - name: Login to ACR
-        run: az acr login --name "$ACR_NAME"
+      - run: az acr login --name "$ACR_NAME"
 
-      - name: Build and push Docker image
+      - name: Docker build & push
         run: |
           docker build -t "${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}" ./app
           docker push "${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
 
-      - name: Install Helm
-        uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v4
         with:
           version: v3.14.4
 
-      - name: Install PyYAML (bump GitOps values)
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml
 
-      - name: Bump image tag in GitOps values
+      - name: Bump GitOps image (values-${BRANCH}.yaml)
         run: |
           python3 <<'PY'
           import os, pathlib, yaml
-          branch, tag = os.environ["BRANCH"], os.environ["IMAGE_TAG"]
+          b, tag = os.environ["BRANCH"], os.environ["IMAGE_TAG"]
           repo = f'{os.environ["ACR_LOGIN_SERVER"]}/{os.environ["IMAGE_NAME"]}'
-          path = pathlib.Path("gitops/helm/chat-app") / f"values-{branch}.yaml"
-          data = yaml.safe_load(path.read_text()) or {}
-          data.setdefault("image", {})
-          data["image"]["repository"] = repo
-          data["image"]["tag"] = tag
-          path.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
+          p = pathlib.Path(os.environ["GITOPS_CHART_DIR"]) / f"values-{b}.yaml"
+          d = yaml.safe_load(p.read_text()) or {}
+          d.setdefault("image", {})
+          d["image"]["repository"], d["image"]["tag"] = repo, tag
+          p.write_text(yaml.dump(d, default_flow_style=False, sort_keys=False))
           PY
 
-      - name: Helm template (validate chart)
+      - name: helm template
         run: |
-          test -f "${GITOPS_CHART_DIR}/values-${BRANCH}.yaml" || {
-            echo "::error::Missing ${GITOPS_CHART_DIR}/values-${BRANCH}.yaml"
-            exit 1
-          }
+          f="${GITOPS_CHART_DIR}/values-${BRANCH}.yaml"
+          test -f "$f" || { echo "::error::Missing $f"; exit 1; }
           helm template "chat-app-${BRANCH}" "${GITOPS_CHART_DIR}" \
-            -f "${GITOPS_CHART_DIR}/values.yaml" \
-            -f "${GITOPS_CHART_DIR}/values-${BRANCH}.yaml"
+            -f "${GITOPS_CHART_DIR}/values.yaml" -f "$f"
 
-      - name: Commit and push GitOps tag
+      - name: Commit GitOps
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "gitops/helm/chat-app/values-${BRANCH}.yaml"
-          if git diff --staged --quiet; then
-            echo "No GitOps changes to commit."
-            exit 0
-          fi
-          git commit -m "chore(gitops): bump ${IMAGE_NAME} image to ${IMAGE_TAG} [skip ci]"
+          git add "${GITOPS_CHART_DIR}/values-${BRANCH}.yaml"
+          git diff --staged --quiet && exit 0
+          git commit -m "chore(gitops): bump ${IMAGE_NAME} to ${IMAGE_TAG} [skip ci]"
           git push

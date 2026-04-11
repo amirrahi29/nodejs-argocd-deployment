@@ -5,10 +5,8 @@ image:
   tag: "latest"
   pullPolicy: IfNotPresent
 
-imagePullSecrets: []
-
 service:
-  type: ClusterIP
+  type: LoadBalancer
   port: 3000
 
 env:
