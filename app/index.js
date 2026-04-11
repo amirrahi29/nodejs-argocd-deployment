@@ -8,7 +8,7 @@ app.get("/", (req, res) => {
 <html lang="en">
 <head><meta charset="utf-8"><title>Welcome uat branch</title></head>
 <body>
-  <h1>Welcome! uat branch</h1>
+  <h1>Welcome! uat branch...</h1>
   <p><a href="/data">GET /data</a> — JSON response</p>
 </body> 
 </html>`);
