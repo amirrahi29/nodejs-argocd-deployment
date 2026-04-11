@@ -66,7 +66,7 @@ jobs:
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml
       - name: Load config/project.yaml
         run: python3 scripts/apply-project-config.py --github-env >> "$GITHUB_ENV"
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           version: ${{ env.HELM_VERSION }}
       - run: bash scripts/helm-template-overlays.sh "$CHART"
@@ -115,7 +115,7 @@ jobs:
           docker build -t "${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}" ./app
           docker push "${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
 
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           version: ${{ env.HELM_VERSION }}
 
