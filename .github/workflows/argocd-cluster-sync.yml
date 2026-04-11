@@ -1,0 +1,61 @@
+name: Argo CD cluster sync
+
+# Applies gitops/argocd/applications/*.yaml to AKS so you do not rely on manual kubectl after setup.
+# Requires repository Variables: AKS_RESOURCE_GROUP, AKS_CLUSTER_NAME (Settings → Secrets and variables → Actions → Variables).
+# Optional Variable: AKS_USE_ADMIN_KUBECONFIG = true if Azure AD–enabled cluster blocks the service principal without admin kubeconfig.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "gitops/argocd/**"
+      - ".github/workflows/argocd-cluster-sync.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: argocd-cluster-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    if: vars.AKS_CLUSTER_NAME != '' && vars.AKS_RESOURCE_GROUP != ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Azure subscription
+        run: |
+          set -euo pipefail
+          SUB="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+          [ -z "$SUB" ] || az account set --subscription "$SUB"
+
+      - uses: azure/setup-kubectl@v4
+
+      - name: Kubeconfig (AKS)
+        env:
+          USE_ADMIN: ${{ vars.AKS_USE_ADMIN_KUBECONFIG }}
+        run: |
+          set -euo pipefail
+          ARGS=(--resource-group "${{ vars.AKS_RESOURCE_GROUP }}" --name "${{ vars.AKS_CLUSTER_NAME }}" --overwrite-existing)
+          if [ "${USE_ADMIN:-}" = "true" ]; then ARGS+=(--admin); fi
+          az aks get-credentials "${ARGS[@]}"
+
+      - name: Apply Argo CD application manifests
+        run: |
+          set -euo pipefail
+          kubectl apply -n argocd -f gitops/argocd/applications/
+
+  needs-aks-vars:
+    runs-on: ubuntu-latest
+    if: vars.AKS_CLUSTER_NAME == '' || vars.AKS_RESOURCE_GROUP == ''
+    steps:
+      - name: Configure GitHub Actions variables
+        run: |
+          echo "::notice::Set repository Variables AKS_RESOURCE_GROUP and AKS_CLUSTER_NAME (Actions → Variables) to enable automatic apply. See docs/automation.md"

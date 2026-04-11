@@ -1,6 +1,6 @@
 # nodejs-argocd-deployment
 
-Node app (`app/`), Helm chart (`gitops/helm/chat-app`), Argo CD ApplicationSet (`gitops/argocd/`). For a production-style checklist (branch protection, OIDC, Ingress, secrets), see [docs/industry-alignment.md](docs/industry-alignment.md). For rollbacks (Git vs Argo vs `kubectl`), see [docs/rollback.md](docs/rollback.md).
+Node app (`app/`), Helm chart (`gitops/helm/chat-app`), Argo CD ApplicationSet (`gitops/argocd/`). For automation boundaries (what is push-only vs one-time setup), see [docs/automation.md](docs/automation.md). For production hardening, [docs/industry-alignment.md](docs/industry-alignment.md). For rollbacks, [docs/rollback.md](docs/rollback.md).
 
 ## Branches and environments
 
@@ -42,10 +42,14 @@ git config fetch.prune true
 
 ## Argo CD UI on LoadBalancer (GitOps)
 
-This is **not** per-environment: one `argocd-server` LoadBalancer is the single entry point for all envs. Manifests live under `gitops/argocd/platform/` (`argocd-server` → `type: LoadBalancer`). One-time bootstrap so Argo syncs that folder from `main`:
+This is **not** per-environment: one `argocd-server` LoadBalancer is the single entry point for all envs. Manifests live under `gitops/argocd/platform/` (`argocd-server` → `type: LoadBalancer`).
+
+**Automatic (recommended):** set GitHub Actions **Variables** `AKS_RESOURCE_GROUP` and `AKS_CLUSTER_NAME`. On every push to **`main`** that touches `gitops/argocd/**`, workflow **`Argo CD cluster sync`** runs `kubectl apply -n argocd -f gitops/argocd/applications/` — no manual apply. Details: [docs/automation.md](docs/automation.md).
+
+**Fallback (first time or without Variables):**
 
 ```bash
-kubectl apply -n argocd -f gitops/argocd/applications/argocd-platform-application.yaml
+kubectl apply -n argocd -f gitops/argocd/applications/
 ```
 
 The cloud control plane assigns the public IP **automatically** when the Service becomes `LoadBalancer`; you do not set the IP in Git. To **wait and print** the URL (no manual `kubectl get` loop):
@@ -62,3 +66,5 @@ If Argo was installed with Helm and labels differ, adjust the `Service` `selecto
 ## CI
 
 `.github/workflows/ci.yml`: GitOps-only changes run `helm template` on all overlays; app (or workflow) changes build, push to ACR, patch `values-<branch>.yaml`, then commit with `git pull --rebase` retries.
+
+`.github/workflows/argocd-cluster-sync.yml`: applies Argo Application / ApplicationSet YAML to AKS from `main` when `gitops/argocd/**` changes (requires Variables above).

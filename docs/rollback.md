@@ -6,7 +6,7 @@ Source of truth is **Git**. To roll back **what Argo deploys**:
 
 1. **Revert the bad commit** (or restore an old `values-<env>.yaml` image tag) on the branch that env tracks (`dev` / `main` / …).
 2. **Push**; CI may rebuild if `app/**` changed.
-3. Argo **syncs** the previous desired state automatically (if auto-sync is on), or click **Sync** in the UI.
+3. With **auto-sync** (your ApplicationSet / platform app), Argo applies the reverted state **without** opening the UI — fully automatic once Git is fixed.
 
 ```bash
 git revert <bad-commit-sha>   # or git checkout <old-commit> -- path/to/file

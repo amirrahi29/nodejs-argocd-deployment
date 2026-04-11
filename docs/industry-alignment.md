@@ -1,5 +1,7 @@
 # Industry-standard alignment (checklist)
 
+For what is already push-only vs one-time platform setup, read [automation.md](automation.md) first.
+
 Your repo already follows several good practices: GitOps with Argo CD, CI with path filters, Helm overlays per environment, `DEPLOY_ENV`, Argo server config in Git, and safe push scripting.
 
 Below is how teams usually tighten this for **production** and **compliance**. Items marked **(portal)** are done in GitHub / Azure / Argo UI, not in this repository.
