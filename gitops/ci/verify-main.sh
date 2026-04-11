@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Post-deploy: rollout + Argo health + in-cluster /healthz; Argo rollback if checks fail.
-# GitHub Actions sets VERIFY_* from the push branch; this repo defaults to uat for local runs.
+# Defaults target the main env; override with VERIFY_NAMESPACE, VERIFY_ARGO_APP, VERIFY_DEPLOYMENT.
 set -euo pipefail
 
-NS_APP="${VERIFY_NAMESPACE:-uat}"
+NS_APP="${VERIFY_NAMESPACE:-main}"
 P="${ARGO_APP_PREFIX:-chat-app}"
 C="${HELM_CHART_NAME:-chat-app}"
-DEPLOY="${VERIFY_DEPLOYMENT:-${P}-uat-${C}}"
-ARGO_APP="${VERIFY_ARGO_APP:-${P}-uat}"
+DEPLOY="${VERIFY_DEPLOYMENT:-${P}-main-${C}}"
+ARGO_APP="${VERIFY_ARGO_APP:-${P}-main}"
 ARGO_NS="${VERIFY_ARGO_NS:-argocd}"
 ROLLOUT_TIMEOUT="${VERIFY_ROLLOUT_TIMEOUT:-5m}"
 ARGO_WAIT_SEC="${VERIFY_ARGO_WAIT_SEC:-600}"

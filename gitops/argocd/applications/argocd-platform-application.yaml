@@ -9,7 +9,7 @@ spec:
   project: chat-app-platform
   source:
     repoURL: https://github.com/amirrahi29/nodejs-argocd-deployment.git
-    targetRevision: uat
+    targetRevision: main
     path: gitops/argocd/platform
   destination:
     server: https://kubernetes.default.svc

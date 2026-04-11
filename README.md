@@ -1,49 +1,43 @@
 # nodejs-argocd-deployment
 
-**Default branch for day-to-day work on this line: `uat`.** CI applies Argo manifests to the cluster and runs post-deploy verify **only on pushes to `uat`** (plus manual `workflow_dispatch`). Layout matches the **dev** branch pattern (`gitops/project.yaml`, `apply-project-config.py`, AppProjects + ApplicationSet).
+Node app (`app/`), Helm chart (`gitops/helm/chat-app`), Argo CD manifests under `gitops/argocd/applications/` (generated from `gitops/project.yaml` via `apply-project-config.py`).
 
-Node app (`app/`), Helm chart (`gitops/helm/chat-app`), Argo CD manifests under `gitops/argocd/applications/` (generated from `gitops/project.yaml`).
+## Branching model (recommended)
 
-## Branches and environments
+| Role | Branch |
+|------|--------|
+| **Default / integration** | `main` — GitHub default branch; **only `main` pushes** trigger **kubectl apply** to the cluster (when GitOps, workflow, or project config changes). |
+| **Environments** | `dev`, `staging`, `uat`, `main` — each has `values-<branch>.yaml`; ApplicationSet syncs per env (see generated `applicationset.yaml`). |
+| **Feature work** | Short-lived branches → **PR into `main`**. |
 
-| Branch    | Argo `targetRevision` | Kubernetes namespace |
-|-----------|------------------------|----------------------|
-| `main`    | `main`                 | `main`               |
-| `dev`     | `dev`                  | `dev`                |
-| `staging` | `staging`              | `staging`            |
-| `uat`     | `uat`                  | `uat`                |
+Other branches (`dev`, `staging`, `uat`) can still **build and push images** and bump their overlay; they **do not** apply Argo root manifests to the cluster, avoiding conflicting writers.
 
-Each branch carries its own overlay (`values-<branch>.yaml`). CI may append commits; always `git pull --rebase` before you push.
-
-## Project config (single source of truth)
-
-Edit `gitops/project.yaml`, then:
+## Project config
 
 ```bash
-python3 gitops/apply-project-config.py --sync-files
+python3 gitops/apply-project-config.py --sync-files    # refresh committed YAML + base values
+python3 gitops/apply-project-config.py --helm-all     # validate all overlays
 ```
 
-On **uat**, `git.platform_branch: uat` so the **argocd-platform** Application tracks the `uat` branch.
-
-## Git: push rejected (“fetch first”)
-
-```bash
-git fetch origin
-git pull --rebase origin <branch>
-git push origin <branch>
-```
-
-Recommended:
-
-```bash
-git config pull.rebase true
-git config fetch.prune true
-```
+`git.platform_branch` should stay **`main`** so the **argocd-platform** Application tracks stable platform manifests.
 
 ## CI
 
-Workflow: **Application delivery pipeline** (`.github/workflows/ci.yml`).
+Workflow **Application delivery pipeline** (`.github/workflows/ci.yml`):
 
-- Path detection, **audit**, **render** (on `project.yaml` / script change), **Helm** validate all overlays, **build** when `app/` changes, **argocd-apply** on **`uat` push** (or manual), **verify-deployed** for **`uat`** after apply.
+- **Render** (bot commit from `project.yaml`): **only on `main`** when `gitops/project.yaml` or `apply-project-config.py` changes.
+- **Helm validate all overlays**: on PRs, or when `gitops/**`, project config, or workflow changes.
+- **Build**: when `app/**` changes (any listed branch).
+- **argocd-apply**: **`main` only**, and only when `gitops/**`, project config, or `.github/workflows/**` changes — or **workflow_dispatch**.
+- **verify-main**: after a successful apply on `main`, when `app` or `gitops` changed (or manual).
 
 Azure: SP fields in `project.yaml` + `AZURE_CLIENT_SECRET`, or `AZURE_CREDENTIALS` JSON.
+
+## Git
+
+If push is rejected after a bot commit:
+
+```bash
+git pull --rebase origin main
+git push origin main
+```
