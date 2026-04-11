@@ -7,9 +7,9 @@ const deployEnv = process.env.DEPLOY_ENV || process.env.NODE_ENV || "local";
 app.get("/", (req, res) => {
   res.type("html").send(`<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8"><title>Welcome — ${deployEnv}</title></head>
+<head><meta charset="utf-8"><title>Welcome — dev branch</title></head>
 <body>
-  <h1>Welcome! (${deployEnv})</h1>
+  <h1>Welcome! dev branch</h1>
   <p><a href="/data">GET /data</a> — JSON response</p>
 </body> 
 </html>`);
