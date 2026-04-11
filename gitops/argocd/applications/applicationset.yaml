@@ -1,0 +1,43 @@
+# kubectl apply -n argocd -f gitops/argocd/applications/applicationset.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: chat-app
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: chat-app-gitops
+spec:
+  generators:
+    - list:
+        elements:
+          - env: dev
+          - env: main
+          - env: staging
+          - env: uat
+  template:
+    metadata:
+      name: "chat-app-{{env}}"
+      namespace: argocd
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+      labels:
+        app.kubernetes.io/part-of: chat-app-gitops
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/amirrahi29/nodejs-argocd-deployment.git
+        targetRevision: "{{env}}"
+        path: gitops/helm/chat-app
+        helm:
+          valueFiles:
+            - values.yaml
+            - "values-{{env}}.yaml"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{env}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

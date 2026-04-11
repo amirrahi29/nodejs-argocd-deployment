@@ -1,5 +1,3 @@
 replicaCount: 2
-image:
-  tag: main-latest
 env:
   NODE_ENV: production

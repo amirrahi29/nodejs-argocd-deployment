@@ -1,6 +1,2 @@
-replicaCount: 1
-image:
-  tag: dev-d571673
-  repository: rahicontaineregistry.azurecr.io/chat-app
 env:
   NODE_ENV: development
