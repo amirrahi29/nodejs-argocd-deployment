@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches: [main, dev, staging, uat]
-  pull_request:
+  pull_request: 
   workflow_dispatch:
 
 concurrency:
