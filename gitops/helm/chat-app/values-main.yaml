@@ -3,4 +3,4 @@ env:
   NODE_ENV: production
 image:
   repository: rahicontaineregistry.azurecr.io/chat-app
-  tag: main-ad1bc44
+  tag: main-7245e6b
