@@ -10,6 +10,8 @@ on:
     paths:
       - "app/**"
       - ".github/workflows/app-build-push.yml"
+  # Manual run: Actions tab → "App — build…" → Run workflow → pick branch (e.g. staging)
+  workflow_dispatch:
 
 permissions:
   contents: write
