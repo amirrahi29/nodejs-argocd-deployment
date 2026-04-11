@@ -2,4 +2,4 @@ env:
   NODE_ENV: uat
 image:
   repository: rahicontaineregistry.azurecr.io/chat-app
-  tag: uat-9f4d6a9
+  tag: uat-2fccaf8
