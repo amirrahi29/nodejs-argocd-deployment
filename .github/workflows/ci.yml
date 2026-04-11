@@ -272,3 +272,79 @@ jobs:
       - name: Apply manifests to Argo CD namespace
         if: steps.gate.outputs.skip == 'false'
         run: kubectl apply -n argocd -f gitops/argocd/applications/
+
+  verify-main:
+    name: Production — verify health & automatic rollback
+    needs: [changes, build, argocd-apply]
+    if: |
+      always() &&
+      needs.argocd-apply.result == 'success' &&
+      (needs.build.result == 'success' || needs.build.result == 'skipped') &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.changes.outputs.app == 'true' || needs.changes.outputs.gitops == 'true'))
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ARGOCD_CLI_VERSION: v2.12.6
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PyYAML
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml
+
+      - name: Load project configuration
+        run: python3 gitops/apply-project-config.py --github-env >> "$GITHUB_ENV"
+
+      - name: Check AKS configuration
+        id: gate
+        run: |
+          if [ -z "${AKS_CLUSTER_NAME:-}" ] || [ -z "${AKS_RESOURCE_GROUP:-}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping production verify — no AKS in gitops/project.yaml."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Sign in to Azure (service principal from project.yaml)
+        if: ${{ steps.gate.outputs.skip == 'false' && env.AZURE_CLIENT_ID != '' && env.AZURE_TENANT_ID != '' && env.AZURE_SUBSCRIPTION_ID != '' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+      - name: Sign in to Azure (credentials JSON secret)
+        if: ${{ steps.gate.outputs.skip == 'false' && (env.AZURE_CLIENT_ID == '' || env.AZURE_TENANT_ID == '' || env.AZURE_SUBSCRIPTION_ID == '') }}
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set up kubectl
+        if: steps.gate.outputs.skip == 'false'
+        uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig for AKS
+        if: steps.gate.outputs.skip == 'false'
+        env:
+          USE_ADMIN: ${{ env.AKS_USE_ADMIN_KUBECONFIG }}
+        run: |
+          set -euo pipefail
+          ARGS=(--resource-group "$AKS_RESOURCE_GROUP" --name "$AKS_CLUSTER_NAME" --overwrite-existing)
+          if [ "${USE_ADMIN:-}" = "true" ]; then ARGS+=(--admin); fi
+          az aks get-credentials "${ARGS[@]}"
+
+      - name: Install Argo CD CLI (core / rollback)
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          curl -sSL -o /usr/local/bin/argocd "https://github.com/argoproj/argo-cd/releases/download/${ARGOCD_CLI_VERSION}/argocd-linux-amd64"
+          chmod +x /usr/local/bin/argocd
+          argocd version --client
+
+      - name: Run rollout, Argo health, smoke test; rollback if failed
+        if: steps.gate.outputs.skip == 'false'
+        run: bash gitops/ci/verify-main.sh
