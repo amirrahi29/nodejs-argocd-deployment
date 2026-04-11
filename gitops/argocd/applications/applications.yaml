@@ -12,7 +12,7 @@ spec:
     targetRevision: dev
     path: gitops/helm/chat-app
     helm: 
-      valueFiles:
+      valueFiles:  
         - values.yaml
         - values-dev.yaml
   destination:
