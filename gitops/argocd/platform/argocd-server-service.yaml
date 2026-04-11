@@ -1,7 +1,4 @@
-# Exposes Argo CD UI/API on a cloud LoadBalancer (AKS assigns a public IP by default).
-# Matches upstream Argo CD install selectors (app.kubernetes.io/name=argocd-server).
-# Private LB on Azure: add under metadata.annotations:
-#   service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+# Private LB (Azure): metadata.annotations service.beta.kubernetes.io/azure-load-balancer-internal: "true"
 apiVersion: v1
 kind: Service
 metadata:

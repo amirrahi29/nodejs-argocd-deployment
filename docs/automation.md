@@ -7,7 +7,7 @@ Goal: **day-to-day work = push to Git only**. No manual `kubectl` for Argo Appli
 | Flow | How |
 |------|-----|
 | Build image + bump `values-<branch>.yaml` | `CI` workflow on `app/**` or `ci.yml` change |
-| Validate Helm overlays | `CI` → `helm` job on `gitops/**` change |
+| Validate Helm overlays | `CI` → `helm` job on `gitops/**` or `scripts/**` change |
 | Apply `gitops/argocd/applications/*.yaml` to AKS | **`Argo CD cluster sync`** on push to **`main`** when `gitops/argocd/**` changes |
 | Sync chat-app to cluster | Argo CD **auto-sync** (ApplicationSet) |
 | Sync Argo platform (e.g. LoadBalancer Service) | `argocd-platform` Application **auto-sync** |
@@ -22,7 +22,7 @@ Goal: **day-to-day work = push to Git only**. No manual `kubectl` for Argo Appli
    - **`AKS_CLUSTER_NAME`** — e.g. `ChatAppCluster`
 4. **Azure RBAC**: the same service principal (or identity CI uses) must be allowed to run **`az aks get-credentials`** on that cluster (e.g. *Azure Kubernetes Service Cluster User Role* or *Cluster Admin*). If sync fails with auth errors, set Variable **`AKS_USE_ADMIN_KUBECONFIG`** to **`true`** (trade-off: admin kubeconfig in automation).
 
-Until variables (3) are set, **`Argo CD cluster sync`** skips the apply job and prints a notice — CI still passes; nothing breaks.
+Until variables (3) are set, **`Argo CD cluster sync`** skips the apply job (green run, no cluster changes).
 
 ## First push before variables were set
 

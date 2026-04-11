@@ -1,70 +1,43 @@
 # nodejs-argocd-deployment
 
-Node app (`app/`), Helm chart (`gitops/helm/chat-app`), Argo CD ApplicationSet (`gitops/argocd/`). For automation boundaries (what is push-only vs one-time setup), see [docs/automation.md](docs/automation.md). For production hardening, [docs/industry-alignment.md](docs/industry-alignment.md). For rollbacks, [docs/rollback.md](docs/rollback.md).
+Express app, Helm chart, and Argo CD ApplicationSet (one Git branch per environment).
 
-## Branches and environments
+**Docs:** [automation](docs/automation.md) · [industry alignment](docs/industry-alignment.md) · [rollback](docs/rollback.md)
 
-| Branch   | Argo `targetRevision` | Kubernetes namespace |
-|----------|------------------------|----------------------|
-| `main`   | `main`                 | `main`               |
-| `dev`    | `dev`                  | `dev`                |
-| `staging`| `staging`              | `staging`            |
-| `uat`    | `uat`                  | `uat`                |
+## Layout
 
-Each branch carries its own GitOps overlay (`values-<branch>.yaml`). CI may append commits (image tag bumps); always integrate remote before you push.
+| Path | Purpose |
+|------|---------|
+| `app/` | Container image source |
+| `gitops/helm/chat-app` | Chart, `values.yaml`, `values-<env>.yaml` |
+| `gitops/argocd/` | ApplicationSet, `argocd-platform` app, `argocd-server` Service |
+| `scripts/` | `git-push.sh`, `wait-argocd-url.sh`, `helm-template-overlays.sh`, `patch-values-image.py` |
+| `.github/workflows` | `ci.yml`, `argocd-cluster-sync.yml` |
+| `.github/actions/azure-subscription` | Shared `az account set` step for workflows |
 
-**Argo CD** is installed **once** per cluster (`argocd` namespace). There is **one UI URL** for every environment: you manage `chat-app-dev`, `chat-app-main`, `chat-app-staging`, and `chat-app-uat` as separate Applications in that same Argo. Only the **chat-app** LoadBalancers (per namespace) differ per env.
+**Reuse / fork:** set `repoURL` in `gitops/argocd/applications/applicationset.yaml` and `argocd-platform-application.yaml`. Tune `env` in `.github/workflows/ci.yml` (`ACR_*`, `IMAGE_NAME`, `CHART`, `HELM_VERSION`).
 
-## Git: push rejected (“fetch first”)
+## Branches
 
-That means `origin/<branch>` has commits you do not have (often the GitHub Actions bot after a build). **Do not** force-push to recover unless you intend to drop remote commits.
+| Branch | Argo tracks | K8s namespace |
+|--------|-------------|----------------|
+| `main` | `main` | `main` |
+| `dev` | `dev` | `dev` |
+| `staging` | `staging` | `staging` |
+| `uat` | `uat` | `uat` |
 
-```bash
-git fetch origin
-git pull --rebase origin <branch>
-git push origin <branch>
-```
+One Argo CD URL for every env; per-env app LoadBalancers differ.
 
-Or use the helper (same steps):
-
-```bash
-chmod +x scripts/git-push.sh   # once
-./scripts/git-push.sh          # current branch
-./scripts/git-push.sh dev      # explicit branch
-```
-
-Recommended local defaults (linear history, fewer surprise merge commits):
+## Useful commands
 
 ```bash
-git config pull.rebase true
-git config fetch.prune true
-```
-
-## Argo CD UI on LoadBalancer (GitOps)
-
-This is **not** per-environment: one `argocd-server` LoadBalancer is the single entry point for all envs. Manifests live under `gitops/argocd/platform/` (`argocd-server` → `type: LoadBalancer`).
-
-**Automatic (recommended):** set GitHub Actions **Variables** `AKS_RESOURCE_GROUP` and `AKS_CLUSTER_NAME`. On every push to **`main`** that touches `gitops/argocd/**`, workflow **`Argo CD cluster sync`** runs `kubectl apply -n argocd -f gitops/argocd/applications/` — no manual apply. Details: [docs/automation.md](docs/automation.md).
-
-**Fallback (first time or without Variables):**
-
-```bash
-kubectl apply -n argocd -f gitops/argocd/applications/
-```
-
-The cloud control plane assigns the public IP **automatically** when the Service becomes `LoadBalancer`; you do not set the IP in Git. To **wait and print** the URL (no manual `kubectl get` loop):
-
-```bash
-chmod +x scripts/wait-argocd-url.sh   # once
+./scripts/git-push.sh
 ./scripts/wait-argocd-url.sh
 ```
 
-Optional: `MAX_WAIT_SEC=900 ./scripts/wait-argocd-url.sh`
+If GitHub Variables `AKS_RESOURCE_GROUP` / `AKS_CLUSTER_NAME` are unset: `kubectl apply -n argocd -f gitops/argocd/applications/` once. See [automation.md](docs/automation.md).
 
-If Argo was installed with Helm and labels differ, adjust the `Service` `selector` in `gitops/argocd/platform/argocd-server-service.yaml` to match your install.
+## CI (summary)
 
-## CI
-
-`.github/workflows/ci.yml`: GitOps-only changes run `helm template` on all overlays; app (or workflow) changes build, push to ACR, patch `values-<branch>.yaml`, then commit with `git pull --rebase` retries.
-
-`.github/workflows/argocd-cluster-sync.yml`: applies Argo Application / ApplicationSet YAML to AKS from `main` when `gitops/argocd/**` changes (requires Variables above).
+- **CI:** path filters → Helm validate all overlays (`scripts/helm-template-overlays.sh`) or Docker build + `patch-values-image.py` + push GitOps bump.
+- **Argo CD cluster sync:** applies `gitops/argocd/applications/` to AKS on `main` when that tree changes.

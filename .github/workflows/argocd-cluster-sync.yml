@@ -1,9 +1,5 @@
 name: Argo CD cluster sync
 
-# Applies gitops/argocd/applications/*.yaml to AKS so you do not rely on manual kubectl after setup.
-# Requires repository Variables: AKS_RESOURCE_GROUP, AKS_CLUSTER_NAME (Settings → Secrets and variables → Actions → Variables).
-# Optional Variable: AKS_USE_ADMIN_KUBECONFIG = true if Azure AD–enabled cluster blocks the service principal without admin kubeconfig.
-
 on:
   push:
     branches: [main]
@@ -30,11 +26,9 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Azure subscription
-        run: |
-          set -euo pipefail
-          SUB="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-          [ -z "$SUB" ] || az account set --subscription "$SUB"
+      - uses: ./.github/actions/azure-subscription
+        with:
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - uses: azure/setup-kubectl@v4
 
@@ -48,14 +42,4 @@ jobs:
           az aks get-credentials "${ARGS[@]}"
 
       - name: Apply Argo CD application manifests
-        run: |
-          set -euo pipefail
-          kubectl apply -n argocd -f gitops/argocd/applications/
-
-  needs-aks-vars:
-    runs-on: ubuntu-latest
-    if: vars.AKS_CLUSTER_NAME == '' || vars.AKS_RESOURCE_GROUP == ''
-    steps:
-      - name: Configure GitHub Actions variables
-        run: |
-          echo "::notice::Set repository Variables AKS_RESOURCE_GROUP and AKS_CLUSTER_NAME (Actions → Variables) to enable automatic apply. See docs/automation.md"
+        run: kubectl apply -n argocd -f gitops/argocd/applications/

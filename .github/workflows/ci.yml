@@ -10,6 +10,7 @@ permissions:
   contents: read
 
 env:
+  HELM_VERSION: v3.14.4
   ACR_NAME: rahicontaineregistry
   ACR_LOGIN_SERVER: rahicontaineregistry.azurecr.io
   IMAGE_NAME: chat-app
@@ -32,8 +33,11 @@ jobs:
               - 'app/**'
             gitops:
               - 'gitops/**'
+              - 'scripts/**'
             workflow:
               - '.github/workflows/ci.yml'
+              - '.github/workflows/argocd-cluster-sync.yml'
+              - '.github/actions/**'
 
   helm:
     needs: changes
@@ -43,15 +47,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
         with:
-          version: v3.14.4
-      - name: helm template (all overlays)
-        run: |
-          set -euo pipefail
-          for f in "$CHART"/values-*.yaml; do
-            case "$(basename "$f")" in values.yaml) continue ;; esac
-            e="${f#"$CHART"/values-}"; e="${e%.yaml}"
-            helm template "chat-app-$e" "$CHART" -f "$CHART/values.yaml" -f "$f"
-          done
+          version: ${{ env.HELM_VERSION }}
+      - run: bash scripts/helm-template-overlays.sh "${{ env.CHART }}"
 
   build:
     needs: changes
@@ -69,11 +66,13 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Azure subscription and ACR
+      - uses: ./.github/actions/azure-subscription
+        with:
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Azure / ACR sanity
         run: |
           set -euo pipefail
-          SUB="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-          [ -z "$SUB" ] || az account set --subscription "$SUB"
           az account show -o table
           az acr show -n "$ACR_NAME" --query "{name:name,loginServer:loginServer}" -o table
 
@@ -91,28 +90,15 @@ jobs:
 
       - uses: azure/setup-helm@v4
         with:
-          version: v3.14.4
+          version: ${{ env.HELM_VERSION }}
 
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml
 
-      - name: Patch values-${BRANCH}.yaml (image)
-        run: |
-          python3 <<'PY'
-          import os, pathlib, yaml
-          b, tag = os.environ["BRANCH"], os.environ["IMAGE_TAG"]
-          repo = f'{os.environ["ACR_LOGIN_SERVER"]}/{os.environ["IMAGE_NAME"]}'
-          p = pathlib.Path(os.environ["CHART"]) / f"values-{b}.yaml"
-          d = yaml.safe_load(p.read_text()) or {}
-          d.setdefault("image", {})
-          d["image"]["repository"], d["image"]["tag"] = repo, tag
-          p.write_text(yaml.dump(d, default_flow_style=False, sort_keys=False))
-          PY
+      - name: Patch Helm image values
+        run: python3 scripts/patch-values-image.py
 
-      - name: helm template
-        run: |
-          f="$CHART/values-${BRANCH}.yaml"
-          test -f "$f" || { echo "::error::Missing $f"; exit 1; }
-          helm template "chat-app-${BRANCH}" "$CHART" -f "$CHART/values.yaml" -f "$f"
+      - name: helm template (current branch overlay)
+        run: bash scripts/helm-template-overlays.sh "$CHART" "$BRANCH"
 
       - name: Commit and push GitOps
         run: |
