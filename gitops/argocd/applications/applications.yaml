@@ -8,9 +8,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/CHANGE_ME_ORG/CHANGE_ME_GITOPS_REPO.git
+    repoURL: https://github.com/amirrahi29/nodejs-argocd-deployment.git
     targetRevision: dev
-    path: helm/chat-app
+    path: gitops/helm/chat-app
     helm:
       valueFiles:
         - values.yaml
@@ -35,9 +35,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/CHANGE_ME_ORG/CHANGE_ME_GITOPS_REPO.git
+    repoURL: https://github.com/amirrahi29/nodejs-argocd-deployment.git
     targetRevision: main
-    path: helm/chat-app
+    path: gitops/helm/chat-app
     helm:
       valueFiles:
         - values.yaml
@@ -62,9 +62,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/CHANGE_ME_ORG/CHANGE_ME_GITOPS_REPO.git
+    repoURL: https://github.com/amirrahi29/nodejs-argocd-deployment.git
     targetRevision: staging
-    path: helm/chat-app
+    path: gitops/helm/chat-app
     helm:
       valueFiles:
         - values.yaml
@@ -89,9 +89,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/CHANGE_ME_ORG/CHANGE_ME_GITOPS_REPO.git
+    repoURL: https://github.com/amirrahi29/nodejs-argocd-deployment.git
     targetRevision: uat
-    path: helm/chat-app
+    path: gitops/helm/chat-app
     helm:
       valueFiles:
         - values.yaml

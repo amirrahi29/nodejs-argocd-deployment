@@ -15,8 +15,8 @@ permissions:
   contents: write
 
 env:
-  ACR_NAME: rahicontaineregistry
-  ACR_LOGIN_SERVER: rahicontaineregistry.azurecr.io
+  ACR_NAME: RahiContainerRegistry
+  ACR_LOGIN_SERVER: rahicontainerregistry.azurecr.io
   IMAGE_NAME: chat-app
   GITOPS_CHART_DIR: gitops/helm/chat-app
 
