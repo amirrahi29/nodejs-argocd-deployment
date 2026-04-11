@@ -7,36 +7,36 @@ metadata:
     app.kubernetes.io/part-of: chat-app-gitops
 spec:
   generators:
-    - list:
-        elements:
-          - env: dev
-          - env: main
-          - env: staging
-          - env: uat
+  - list:
+      elements:
+      - env: dev
+      - env: main
+      - env: staging
+      - env: uat
   template:
     metadata:
-      name: "chat-app-{{env}}"
+      name: chat-app-{{env}}
       namespace: argocd
       finalizers:
-        - resources-finalizer.argocd.argoproj.io
+      - resources-finalizer.argocd.argoproj.io
       labels:
         app.kubernetes.io/part-of: chat-app-gitops
     spec:
-      project: default
+      project: chat-app-{{env}}
       source:
         repoURL: https://github.com/amirrahi29/nodejs-argocd-deployment.git
-        targetRevision: "{{env}}"
+        targetRevision: '{{env}}'
         path: gitops/helm/chat-app
         helm:
           valueFiles:
-            - values.yaml
-            - "values-{{env}}.yaml"
+          - values.yaml
+          - values-{{env}}.yaml
       destination:
         server: https://kubernetes.default.svc
-        namespace: "{{env}}"
+        namespace: '{{env}}'
       syncPolicy:
         automated:
           prune: true
           selfHeal: true
         syncOptions:
-          - CreateNamespace=true
+        - CreateNamespace=true
