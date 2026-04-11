@@ -27,8 +27,10 @@ spec:
               containerPort: {{ .Values.service.port }}
               protocol: TCP
           env:
-            - name: NODE_ENV
-              value: {{ .Values.env.NODE_ENV | quote }}
+            {{- range $k, $v := .Values.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
             - name: PORT
               value: {{ .Values.service.port | quote }}
           {{- with .Values.resources }}
