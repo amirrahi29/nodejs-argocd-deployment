@@ -15,9 +15,9 @@ permissions:
   contents: write
 
 env:
-  # ARM / az acr name is lowercase (login server without .azurecr.io)
-  ACR_NAME: rahicontainerregistry
-  ACR_LOGIN_SERVER: rahicontainerregistry.azurecr.io
+  # Must match Portal → ACR → Login server (this registry is rahicontaineregistry, not ...container...)
+  ACR_NAME: rahicontaineregistry
+  ACR_LOGIN_SERVER: rahicontaineregistry.azurecr.io
   IMAGE_NAME: chat-app
   GITOPS_CHART_DIR: gitops/helm/chat-app
 
@@ -49,7 +49,7 @@ jobs:
             echo "::error::ACR '$ACR_NAME' is not in the active subscription (see table above)."
             echo "Usually: ACR is in a different subscription than service principal default."
             echo "Fix: GitHub → Settings → Secrets → add AZURE_SUBSCRIPTION_ID = (Portal: ACR → Overview → Subscription ID)."
-            echo "Then: Entra ID → your app registration → assign Acr Push on that registry (scope: RahiContainerRegistry or RG)."
+            echo "Then: Entra ID → your app registration → assign Acr Push on that registry (scope: registry or RG)."
             exit 1
           fi
 

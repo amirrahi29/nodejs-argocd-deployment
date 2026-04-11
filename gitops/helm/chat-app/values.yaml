@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: rahicontainerregistry.azurecr.io/chat-app
+  repository: rahicontaineregistry.azurecr.io/chat-app
   tag: "latest"
   pullPolicy: IfNotPresent
 
