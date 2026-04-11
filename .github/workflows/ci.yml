@@ -37,7 +37,6 @@ jobs:
             workflow:
               - '.github/workflows/ci.yml'
               - '.github/workflows/argocd-cluster-sync.yml'
-              - '.github/actions/**'
 
   helm:
     needs: changes
@@ -66,9 +65,10 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - uses: ./.github/actions/azure-subscription
-        with:
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Azure subscription (optional)
+        run: |
+          SUB="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+          [ -z "$SUB" ] || az account set --subscription "$SUB"
 
       - name: Azure / ACR sanity
         run: |
@@ -95,7 +95,17 @@ jobs:
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml
 
       - name: Patch Helm image values
-        run: python3 scripts/patch-values-image.py
+        run: |
+          python3 <<'PY'
+          import os, pathlib, yaml
+          b, tag = os.environ["BRANCH"], os.environ["IMAGE_TAG"]
+          repo = f'{os.environ["ACR_LOGIN_SERVER"]}/{os.environ["IMAGE_NAME"]}'
+          p = pathlib.Path(os.environ["CHART"]) / f"values-{b}.yaml"
+          d = yaml.safe_load(p.read_text()) or {}
+          d.setdefault("image", {})
+          d["image"]["repository"], d["image"]["tag"] = repo, tag
+          p.write_text(yaml.dump(d, default_flow_style=False, sort_keys=False))
+          PY
 
       - name: helm template (current branch overlay)
         run: bash scripts/helm-template-overlays.sh "$CHART" "$BRANCH"

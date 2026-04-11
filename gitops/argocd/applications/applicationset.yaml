@@ -24,7 +24,7 @@ spec:
     spec:
       project: default
       source:
-        # Fork: set repoURL to your clone
+        # fork: repoURL
         repoURL: https://github.com/amirrahi29/nodejs-argocd-deployment.git
         targetRevision: "{{env}}"
         path: gitops/helm/chat-app

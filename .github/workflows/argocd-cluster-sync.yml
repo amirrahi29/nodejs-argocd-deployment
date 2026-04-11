@@ -26,9 +26,10 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - uses: ./.github/actions/azure-subscription
-        with:
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Azure subscription (optional)
+        run: |
+          SUB="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+          [ -z "$SUB" ] || az account set --subscription "$SUB"
 
       - uses: azure/setup-kubectl@v4
 

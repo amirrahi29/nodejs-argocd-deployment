@@ -8,7 +8,6 @@ metadata:
 spec:
   project: default
   source:
-    # Fork: match applicationset repoURL
     repoURL: https://github.com/amirrahi29/nodejs-argocd-deployment.git
     targetRevision: main
     path: gitops/argocd/platform

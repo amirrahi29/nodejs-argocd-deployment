@@ -1,4 +1,3 @@
-# Private LB (Azure): metadata.annotations service.beta.kubernetes.io/azure-load-balancer-internal: "true"
 apiVersion: v1
 kind: Service
 metadata:

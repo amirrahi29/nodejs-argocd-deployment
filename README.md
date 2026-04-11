@@ -1,43 +1,37 @@
 # nodejs-argocd-deployment
 
-Express app, Helm chart, and Argo CD ApplicationSet (one Git branch per environment).
-
-**Docs:** [automation](docs/automation.md) · [industry alignment](docs/industry-alignment.md) · [rollback](docs/rollback.md)
+Express + Helm + Argo CD (one Git branch per env: `dev` / `main` / `staging` / `uat`).
 
 ## Layout
 
 | Path | Purpose |
 |------|---------|
-| `app/` | Container image source |
-| `gitops/helm/chat-app` | Chart, `values.yaml`, `values-<env>.yaml` |
-| `gitops/argocd/` | ApplicationSet, `argocd-platform` app, `argocd-server` Service |
-| `scripts/` | `git-push.sh`, `wait-argocd-url.sh`, `helm-template-overlays.sh`, `patch-values-image.py` |
-| `.github/workflows` | `ci.yml`, `argocd-cluster-sync.yml` |
-| `.github/actions/azure-subscription` | Shared `az account set` step for workflows |
+| `app/` | Image source |
+| `gitops/helm/chat-app` | Chart + `values-<env>.yaml` |
+| `gitops/argocd/` | ApplicationSet, platform app, `argocd-server` Service |
+| `scripts/helpers.sh` | `push` \| `argocd-wait` |
+| `scripts/helm-template-overlays.sh` | `helm template` all overlays or one branch |
 
-**Reuse / fork:** set `repoURL` in `gitops/argocd/applications/applicationset.yaml` and `argocd-platform-application.yaml`. Tune `env` in `.github/workflows/ci.yml` (`ACR_*`, `IMAGE_NAME`, `CHART`, `HELM_VERSION`).
+**Fork:** set `repoURL` in `gitops/argocd/applications/*.yaml`. **CI env:** `.github/workflows/ci.yml` (`ACR_*`, `IMAGE_NAME`, `CHART`).
 
-## Branches
+## Ops (short)
 
-| Branch | Argo tracks | K8s namespace |
-|--------|-------------|----------------|
-| `main` | `main` | `main` |
-| `dev` | `dev` | `dev` |
-| `staging` | `staging` | `staging` |
-| `uat` | `uat` | `uat` |
+- **Auto:** push → CI builds & bumps image on `app/**`; `helm template` on `gitops/**` or `scripts/**`; on `main`, `argocd-cluster-sync` applies `gitops/argocd/applications/` if Variables **`AKS_RESOURCE_GROUP`** + **`AKS_CLUSTER_NAME`** are set; Argo auto-syncs apps. Optional **`AKS_USE_ADMIN_KUBECONFIG=true`** if `get-credentials` fails.
+- **One-time:** Azure + AKS + Argo on cluster; GitHub secret **`AZURE_CREDENTIALS`** (optional **`AZURE_SUBSCRIPTION_ID`**).
+- **Rollback:** `git revert` + push (auto-sync), or Argo **History → Rollback** (temporary if auto-sync on), or `kubectl rollout undo` (emergency).
+- **Hardening (portal):** protect `main`, OIDC to Azure instead of long-lived SP, Ingress+TLS for Argo, Key Vault for app secrets.
 
-One Argo CD URL for every env; per-env app LoadBalancers differ.
-
-## Useful commands
+## Commands
 
 ```bash
-./scripts/git-push.sh
-./scripts/wait-argocd-url.sh
+chmod +x scripts/helpers.sh   # once
+./scripts/helpers.sh push
+./scripts/helpers.sh argocd-wait
+bash scripts/helm-template-overlays.sh gitops/helm/chat-app
 ```
 
-If GitHub Variables `AKS_RESOURCE_GROUP` / `AKS_CLUSTER_NAME` are unset: `kubectl apply -n argocd -f gitops/argocd/applications/` once. See [automation.md](docs/automation.md).
+Without AKS Variables: `kubectl apply -n argocd -f gitops/argocd/applications/`.
 
-## CI (summary)
+## CI
 
-- **CI:** path filters → Helm validate all overlays (`scripts/helm-template-overlays.sh`) or Docker build + `patch-values-image.py` + push GitOps bump.
-- **Argo CD cluster sync:** applies `gitops/argocd/applications/` to AKS on `main` when that tree changes.
+`ci.yml` — path filters + image bump (inline Python patch); `argocd-cluster-sync.yml` — apply Argo apps to AKS from `main`.
