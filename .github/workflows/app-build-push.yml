@@ -34,15 +34,24 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Select subscription (must contain ACR)
+      - name: Select subscription & verify ACR
         run: |
           set -euo pipefail
           SUB="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
           if [ -n "$SUB" ]; then
+            echo "Using AZURE_SUBSCRIPTION_ID for subscription context."
             az account set --subscription "$SUB"
+          else
+            echo "::notice::No AZURE_SUBSCRIPTION_ID secret — using subscription from AZURE_CREDENTIALS. If ACR lives in another subscription, add that secret (ACR → Overview → Subscription ID)."
           fi
           az account show --output table
-          az acr show -n "$ACR_NAME" --query "{name:name,loginServer:loginServer}" -o table
+          if ! az acr show -n "$ACR_NAME" --query "{name:name,loginServer:loginServer}" -o table; then
+            echo "::error::ACR '$ACR_NAME' is not in the active subscription (see table above)."
+            echo "Usually: ACR is in a different subscription than service principal default."
+            echo "Fix: GitHub → Settings → Secrets → add AZURE_SUBSCRIPTION_ID = (Portal: ACR → Overview → Subscription ID)."
+            echo "Then: Entra ID → your app registration → assign Acr Push on that registry (scope: RahiContainerRegistry or RG)."
+            exit 1
+          fi
 
       - name: Set branch and image tag
         run: |
