@@ -48,7 +48,16 @@ This is **not** per-environment: one `argocd-server` LoadBalancer is the single 
 kubectl apply -n argocd -f gitops/argocd/applications/argocd-platform-application.yaml
 ```
 
-Then `kubectl get svc argocd-server -n argocd` for the external IP and open `https://<IP>`. If Argo was installed with Helm and labels differ, adjust the `Service` `selector` to match your install.
+The cloud control plane assigns the public IP **automatically** when the Service becomes `LoadBalancer`; you do not set the IP in Git. To **wait and print** the URL (no manual `kubectl get` loop):
+
+```bash
+chmod +x scripts/wait-argocd-url.sh   # once
+./scripts/wait-argocd-url.sh
+```
+
+Optional: `MAX_WAIT_SEC=900 ./scripts/wait-argocd-url.sh`
+
+If Argo was installed with Helm and labels differ, adjust the `Service` `selector` in `gitops/argocd/platform/argocd-server-service.yaml` to match your install.
 
 ## CI
 
