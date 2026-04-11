@@ -18,8 +18,8 @@ helm:
   chart_path: gitops/helm/chat-app
   version: v3.14.4
 
-# AKS (not secrets): set the same values as GitHub Actions → Settings → Variables
-# so you have one list here for copy/paste:
-#   AKS_RESOURCE_GROUP: RahiResource
-#   AKS_CLUSTER_NAME: ChatAppCluster
-# Optional: AKS_USE_ADMIN_KUBECONFIG=true
+# AKS (names are not secrets — live in Git). Empty this block to skip cluster apply job.
+aks:
+  resource_group: RahiResource
+  cluster_name: ChatAppCluster
+  # use_admin_kubeconfig: true   # only if az get-credentials needs --admin

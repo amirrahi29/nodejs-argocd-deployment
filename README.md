@@ -23,12 +23,12 @@ git diff   # review updates to Argo manifests + values.yaml default image
 git commit -am "chore: apply project config"
 ```
 
-CI reads **`config/project.yaml`** at runtime (`--github-env`), so ACR/build use it without re-running sync — but Argo YAML in Git must match (run `--sync-files` before push). **AKS** names stay in **GitHub → Variables** (`AKS_RESOURCE_GROUP`, `AKS_CLUSTER_NAME`); copy from comments in `config/project.yaml`.
+CI reads **`config/project.yaml`** at runtime (`--github-env`), so ACR/build use it without re-running sync — but Argo YAML in Git must match (run `--sync-files` before push). **AKS** `resource_group` / `cluster_name` are in the same file under **`aks:`** (cluster sync skips if that block is empty).
 
 ## Ops (short)
 
-- **Auto:** every push/PR runs **`helm template`** on all overlays; build + image bump only when `app/**` or workflow files change; on `main`, `argocd-cluster-sync` applies `gitops/argocd/applications/` if **`AKS_RESOURCE_GROUP`** + **`AKS_CLUSTER_NAME`** are set. Optional **`AKS_USE_ADMIN_KUBECONFIG=true`** if `get-credentials` fails.
-- **One-time:** Azure + AKS + Argo on cluster; GitHub secret **`AZURE_CREDENTIALS`** (optional **`AZURE_SUBSCRIPTION_ID`**).
+- **Auto:** every push/PR runs **`helm template`**; build + image bump when `app/**` or workflow changes; on `main`, `argocd-cluster-sync` applies Argo apps when **`config/project.yaml`** has **`aks.resource_group`** + **`aks.cluster_name`**. Optional **`aks.use_admin_kubeconfig: true`**.
+- **One-time (cannot live in Git):** Argo installed on cluster; GitHub secrets **`AZURE_CREDENTIALS`** (optional **`AZURE_SUBSCRIPTION_ID`**). **`CODEOWNERS` / `SECURITY.md`** mein apna handle/repo URL ek baar.
 - **Rollback:** `git revert` + push (auto-sync), or Argo **History → Rollback** (temporary if auto-sync on), or `kubectl rollout undo` (emergency).
 - **Hardening (portal):** protect `main`, OIDC to Azure instead of long-lived SP, Ingress+TLS for Argo, Key Vault for app secrets.
 
@@ -41,7 +41,7 @@ chmod +x scripts/helpers.sh   # once
 bash scripts/helm-template-overlays.sh gitops/helm/chat-app
 ```
 
-Without AKS Variables: `kubectl apply -n argocd -f gitops/argocd/applications/`.
+If **`aks:`** empty: `kubectl apply -n argocd -f gitops/argocd/applications/` manually once if needed.
 
 ## CI
 

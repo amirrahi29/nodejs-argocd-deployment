@@ -24,7 +24,7 @@ def load_cfg() -> dict:
 
 
 def github_env_lines(c: dict) -> str:
-    g, az, app, h = c["git"], c["azure"], c["app"], c["helm"]
+    az, app, h = c["azure"], c["app"], c["helm"]
     lines = [
         f"ACR_NAME={az['acr_name']}",
         f"ACR_LOGIN_SERVER={az['acr_login_server']}",
@@ -32,6 +32,13 @@ def github_env_lines(c: dict) -> str:
         f"CHART={h['chart_path']}",
         f"HELM_VERSION={h['version']}",
     ]
+    aks = c.get("aks") or {}
+    rg, cn = aks.get("resource_group"), aks.get("cluster_name")
+    if rg and cn:
+        lines.append(f"AKS_RESOURCE_GROUP={rg}")
+        lines.append(f"AKS_CLUSTER_NAME={cn}")
+        if aks.get("use_admin_kubeconfig"):
+            lines.append("AKS_USE_ADMIN_KUBECONFIG=true")
     return "\n".join(lines) + "\n"
 
 
@@ -46,13 +53,7 @@ def sync_files(c: dict) -> None:
     app_set = ROOT / "gitops/argocd/applications/applicationset.yaml"
     t = app_set.read_text()
     t = re.sub(r"^(\s*repoURL:\s*).+$", rf"\g<1>{repo_url}", t, flags=re.M, count=1)
-    t = re.sub(
-        r"^(\s*path:\s*)gitops/helm/[\w/-]+$",
-        rf"\g<1>{chart_path}",
-        t,
-        flags=re.M,
-        count=1,
-    )
+    t = re.sub(r"^(\s*path:\s*).+$", rf"\g<1>{chart_path}", t, flags=re.M, count=1)
     app_set.write_text(t)
 
     plat = ROOT / "gitops/argocd/applications/argocd-platform-application.yaml"

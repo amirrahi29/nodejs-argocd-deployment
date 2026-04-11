@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "gitops/argocd/**"
+      - "config/project.yaml"
+      - "scripts/apply-project-config.py"
       - ".github/workflows/argocd-cluster-sync.yml"
   workflow_dispatch:
 
@@ -19,29 +21,48 @@ jobs:
   apply:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    if: vars.AKS_CLUSTER_NAME != '' && vars.AKS_RESOURCE_GROUP != ''
     steps:
       - uses: actions/checkout@v4
 
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml
+
+      - name: Load config/project.yaml
+        run: python3 scripts/apply-project-config.py --github-env >> "$GITHUB_ENV"
+
+      - name: Skip when AKS not configured
+        id: gate
+        run: |
+          if [ -z "${AKS_CLUSTER_NAME:-}" ] || [ -z "${AKS_RESOURCE_GROUP:-}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::No aks.resource_group / aks.cluster_name in config/project.yaml — skipping apply."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: azure/login@v2
+        if: steps.gate.outputs.skip == 'false'
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Azure subscription (optional)
+        if: steps.gate.outputs.skip == 'false'
         run: |
           SUB="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
           [ -z "$SUB" ] || az account set --subscription "$SUB"
 
       - uses: azure/setup-kubectl@v4
+        if: steps.gate.outputs.skip == 'false'
 
       - name: Kubeconfig (AKS)
+        if: steps.gate.outputs.skip == 'false'
         env:
-          USE_ADMIN: ${{ vars.AKS_USE_ADMIN_KUBECONFIG }}
+          USE_ADMIN: ${{ env.AKS_USE_ADMIN_KUBECONFIG }}
         run: |
           set -euo pipefail
-          ARGS=(--resource-group "${{ vars.AKS_RESOURCE_GROUP }}" --name "${{ vars.AKS_CLUSTER_NAME }}" --overwrite-existing)
+          ARGS=(--resource-group "$AKS_RESOURCE_GROUP" --name "$AKS_CLUSTER_NAME" --overwrite-existing)
           if [ "${USE_ADMIN:-}" = "true" ]; then ARGS+=(--admin); fi
           az aks get-credentials "${ARGS[@]}"
 
       - name: Apply Argo CD application manifests
+        if: steps.gate.outputs.skip == 'false'
         run: kubectl apply -n argocd -f gitops/argocd/applications/
