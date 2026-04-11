@@ -19,7 +19,7 @@ env:
 jobs:
   changes:
     runs-on: ubuntu-latest
-    outputs:
+    outputs: 
       app: ${{ steps.filter.outputs.app }}
       gitops: ${{ steps.filter.outputs.gitops }}
       workflow: ${{ steps.filter.outputs.workflow }}
