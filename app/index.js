@@ -10,7 +10,7 @@ app.get("/", (req, res) => {
 <body>
   <h1>Welcome!</h1>
   <p><a href="/data">GET /data</a> — JSON response</p>
-</body>
+</body> 
 </html>`);
 });
 
