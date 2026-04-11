@@ -1,0 +1,31 @@
+# This repo is maintained on branch: dev (default integration branch for CI cluster sync + platform app).
+# Single source of truth for GitOps + CI. Edit values, then run:
+#   python3 gitops/apply-project-config.py --sync-files
+#   python3 gitops/apply-project-config.py --helm-all   # optional: validate all overlays
+
+git:
+  repo_url: https://github.com/amirrahi29/nodejs-argocd-deployment.git
+  # Argo "argocd-platform" Application tracks this revision (must match your primary branch).
+  platform_branch: dev
+  platform_path: gitops/argocd/platform
+
+azure:
+  acr_name: rahicontaineregistry
+  acr_login_server: rahicontaineregistry.azurecr.io
+  tenant_id:
+  subscription_id:
+  client_id:
+
+app:
+  image_name: chat-app
+
+helm:
+  chart_path: gitops/helm/chat-app
+  version: v3.14.4
+
+argocd:
+  app_prefix: chat-app
+
+aks:
+  resource_group: RahiResource
+  cluster_name: ChatAppCluster

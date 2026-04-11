@@ -4,6 +4,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const deployEnv = process.env.DEPLOY_ENV || process.env.NODE_ENV || "local";
 
+app.get("/healthz", (_req, res) => {
+  res.status(200).json({ status: "ok", deployEnv });
+});
+
 app.get("/", (req, res) => {
   res.type("html").send(`<!DOCTYPE html>
 <html lang="en">

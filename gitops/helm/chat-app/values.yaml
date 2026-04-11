@@ -1,14 +1,11 @@
 replicaCount: 1
-
 image:
   repository: rahicontaineregistry.azurecr.io/chat-app
-  tag: "latest"
+  tag: latest
   pullPolicy: IfNotPresent
-
 service:
   type: LoadBalancer
   port: 3000
-
 env:
   NODE_ENV: production
   DEPLOY_ENV: default
