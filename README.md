@@ -34,4 +34,15 @@ Without AKS Variables: `kubectl apply -n argocd -f gitops/argocd/applications/`.
 
 ## CI
 
-`ci.yml` — path filters + image bump (inline Python patch); `argocd-cluster-sync.yml` — apply Argo apps to AKS from `main`.
+`ci.yml` — path filters, **`npm audit`** (high+) on PRs / app changes, **`helm template`** every run, Docker build when `app/**` or workflow changes; `argocd-cluster-sync.yml` — apply Argo apps to AKS from `main`. PR concurrency cancels superseded runs.
+
+## Enterprise / governance
+
+| Item | Location |
+|------|----------|
+| Vulnerability reporting | [SECURITY.md](SECURITY.md) |
+| Default reviewers | [.github/CODEOWNERS](.github/CODEOWNERS) |
+| Dependency & Actions updates | [.github/dependabot.yml](.github/dependabot.yml) |
+| PR checklist | [.github/pull_request_template.md](.github/pull_request_template.md) |
+
+**Runtime:** non-root pod, read-only root FS, dropped capabilities, `seccompProfile: RuntimeDefault`, `/healthz` for probes, default **requests/limits** in `values.yaml`. Next steps in production: branch protection, GitHub → Azure **OIDC**, Argo **Ingress + SSO**, **Key Vault** for secrets.
