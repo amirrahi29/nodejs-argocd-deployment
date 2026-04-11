@@ -3,7 +3,7 @@ build
 npm-debug.log
 .git
 .github
-.env
+.env 
 .env.*
 !.env.example
 *.md
