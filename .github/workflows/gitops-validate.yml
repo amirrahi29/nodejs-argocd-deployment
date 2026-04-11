@@ -9,7 +9,7 @@ on:
       - staging
     paths:
       - "gitops/**"
-      - ".github/workflows/gitops-validate.yml"
+      - ".github/workflows/gitops-validate.yml" 
   pull_request:
     paths:
       - "gitops/**"
