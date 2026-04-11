@@ -1,0 +1,25 @@
+# Single place to tune this template for another org/project. Then run:
+#   python3 scripts/apply-project-config.py --sync-files && git diff
+# CI reads this file at runtime (no need to sync for ACR/build unless you want Git copies updated).
+
+git:
+  repo_url: https://github.com/amirrahi29/nodejs-argocd-deployment.git
+  # Branch the argocd-platform Application uses for gitops/argocd/platform/
+  platform_branch: main
+
+azure:
+  acr_name: rahicontaineregistry
+  acr_login_server: rahicontaineregistry.azurecr.io
+
+app:
+  image_name: chat-app
+
+helm:
+  chart_path: gitops/helm/chat-app
+  version: v3.14.4
+
+# AKS (not secrets): set the same values as GitHub Actions → Settings → Variables
+# so you have one list here for copy/paste:
+#   AKS_RESOURCE_GROUP: RahiResource
+#   AKS_CLUSTER_NAME: ChatAppCluster
+# Optional: AKS_USE_ADMIN_KUBECONFIG=true

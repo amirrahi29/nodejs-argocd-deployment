@@ -9,10 +9,21 @@ Express + Helm + Argo CD (one Git branch per env: `dev` / `main` / `staging` / `
 | `app/` | Image source |
 | `gitops/helm/chat-app` | Chart + `values-<env>.yaml` |
 | `gitops/argocd/` | ApplicationSet, platform app, `argocd-server` Service |
+| `config/project.yaml` | **Single file:** Git URL, ACR, image name, Helm chart path, versions |
+| `scripts/apply-project-config.py` | CI reads env from it; `--sync-files` patches Argo + `values.yaml` |
 | `scripts/helpers.sh` | `push` \| `argocd-wait` |
 | `scripts/helm-template-overlays.sh` | `helm template` all overlays or one branch |
 
-**Fork:** set `repoURL` in `gitops/argocd/applications/*.yaml`. **CI env:** `.github/workflows/ci.yml` (`ACR_*`, `IMAGE_NAME`, `CHART`).
+**New project / fork:** edit **`config/project.yaml`** only, then:
+
+```bash
+pip3 install pyyaml   # or: brew install libyaml && … ; CI has python3-yaml
+python3 scripts/apply-project-config.py --sync-files
+git diff   # review updates to Argo manifests + values.yaml default image
+git commit -am "chore: apply project config"
+```
+
+CI reads **`config/project.yaml`** at runtime (`--github-env`), so ACR/build use it without re-running sync — but Argo YAML in Git must match (run `--sync-files` before push). **AKS** names stay in **GitHub → Variables** (`AKS_RESOURCE_GROUP`, `AKS_CLUSTER_NAME`); copy from comments in `config/project.yaml`.
 
 ## Ops (short)
 
