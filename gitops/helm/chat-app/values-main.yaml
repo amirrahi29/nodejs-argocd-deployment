@@ -1,6 +1,6 @@
 replicaCount: 2
 image:
   repository: rahicontaineregistry.azurecr.io/chat-app
-  tag: main-41de959
+  tag: main-1db9dfc
 env:
   NODE_ENV: production
