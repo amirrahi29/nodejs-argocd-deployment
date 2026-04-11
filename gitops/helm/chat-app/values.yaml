@@ -11,4 +11,3 @@ service:
 
 env:
   NODE_ENV: production
- 

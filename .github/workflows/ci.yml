@@ -1,24 +1,64 @@
-name: Build and push image (ACR + GitOps tag)
+name: CI
 
 on:
   push:
     branches: [main, dev, staging, uat]
-    paths-ignore:
-      - "gitops/**"
+  pull_request:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   ACR_NAME: rahicontaineregistry
   ACR_LOGIN_SERVER: rahicontaineregistry.azurecr.io
   IMAGE_NAME: chat-app
-  GITOPS_CHART_DIR: gitops/helm/chat-app
+  CHART: gitops/helm/chat-app
 
 jobs:
-  build-push-bump:
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+      gitops: ${{ steps.filter.outputs.gitops }}
+      workflow: ${{ steps.filter.outputs.workflow }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            app:
+              - 'app/**'
+            gitops:
+              - 'gitops/**'
+            workflow:
+              - '.github/workflows/ci.yml'
+
+  helm:
+    needs: changes
+    if: needs.changes.outputs.gitops == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.14.4
+      - name: helm template (all overlays)
+        run: |
+          set -euo pipefail
+          for f in "$CHART"/values-*.yaml; do
+            case "$(basename "$f")" in values.yaml) continue ;; esac
+            e="${f#"$CHART"/values-}"; e="${e%.yaml}"
+            helm template "chat-app-$e" "$CHART" -f "$CHART/values.yaml" -f "$f"
+          done
+
+  build:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (needs.changes.outputs.app == 'true' || needs.changes.outputs.workflow == 'true'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,7 +77,7 @@ jobs:
           az account show -o table
           az acr show -n "$ACR_NAME" --query "{name:name,loginServer:loginServer}" -o table
 
-      - name: Branch and image tag
+      - name: Branch and tag
         run: |
           echo "BRANCH=${GITHUB_REF#refs/heads/}" >> "$GITHUB_ENV"
           echo "IMAGE_TAG=${GITHUB_REF#refs/heads/}-$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
@@ -55,38 +95,36 @@ jobs:
 
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml
 
-      - name: Update Helm values image tag
+      - name: Patch values-${BRANCH}.yaml (image)
         run: |
           python3 <<'PY'
           import os, pathlib, yaml
           b, tag = os.environ["BRANCH"], os.environ["IMAGE_TAG"]
           repo = f'{os.environ["ACR_LOGIN_SERVER"]}/{os.environ["IMAGE_NAME"]}'
-          p = pathlib.Path(os.environ["GITOPS_CHART_DIR"]) / f"values-{b}.yaml"
+          p = pathlib.Path(os.environ["CHART"]) / f"values-{b}.yaml"
           d = yaml.safe_load(p.read_text()) or {}
           d.setdefault("image", {})
           d["image"]["repository"], d["image"]["tag"] = repo, tag
           p.write_text(yaml.dump(d, default_flow_style=False, sort_keys=False))
           PY
 
-      - name: Helm template validate
+      - name: helm template
         run: |
-          f="${GITOPS_CHART_DIR}/values-${BRANCH}.yaml"
+          f="$CHART/values-${BRANCH}.yaml"
           test -f "$f" || { echo "::error::Missing $f"; exit 1; }
-          helm template "chat-app-${BRANCH}" "${GITOPS_CHART_DIR}" \
-            -f "${GITOPS_CHART_DIR}/values.yaml" -f "$f"
+          helm template "chat-app-${BRANCH}" "$CHART" -f "$CHART/values.yaml" -f "$f"
 
-      - name: Commit and push values (rebase retries)
+      - name: Commit and push GitOps
         run: |
           set -euo pipefail
           BR="${GITHUB_REF_NAME}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "${GITOPS_CHART_DIR}/values-${BRANCH}.yaml"
+          git add "$CHART/values-${BRANCH}.yaml"
           git diff --staged --quiet && exit 0
           git commit -m "chore(gitops): bump ${IMAGE_NAME} ${IMAGE_TAG}"
           for i in 1 2 3 4 5; do
             git pull --rebase origin "$BR" && git push origin "$BR" && exit 0
-            echo "::warning::retry $i"
             sleep $((i * 4))
           done
           exit 1
