@@ -2,7 +2,7 @@ name: App — build, push ACR, bump GitOps image tag
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev, staging, uat]
     paths:
       - "app/**"
       - ".github/workflows/app-build-push.yml"
@@ -24,6 +24,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - uses: azure/login@v2
         with:
@@ -75,11 +76,19 @@ jobs:
           helm template "chat-app-${BRANCH}" "${GITOPS_CHART_DIR}" \
             -f "${GITOPS_CHART_DIR}/values.yaml" -f "$f"
 
-      - name: Commit GitOps
+      - name: Commit GitOps (pull --rebase + push with retries)
         run: |
+          set -euo pipefail
+          BR="${GITHUB_REF_NAME}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "${GITOPS_CHART_DIR}/values-${BRANCH}.yaml"
           git diff --staged --quiet && exit 0
           git commit -m "chore(gitops): bump ${IMAGE_NAME} to ${IMAGE_TAG} [skip ci]"
-          git push
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin "$BR" && git push origin "$BR" && exit 0
+            echo "::warning::Push attempt $i failed, retrying after rebase..."
+            sleep $((i * 4))
+          done
+          echo "::error::Could not push after retries."
+          exit 1

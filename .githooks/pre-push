@@ -1,0 +1,10 @@
+#!/bin/sh
+# Ek baar: git config core.hooksPath .githooks
+set -e
+b=$(git branch --show-current)
+[ -n "$b" ] || exit 0
+git fetch origin "$b" 2>/dev/null || exit 0
+git rev-parse "origin/$b" >/dev/null 2>&1 || exit 0
+git merge-base --is-ancestor "origin/$b" HEAD 2>/dev/null && exit 0
+echo "pre-push: rebasing onto origin/$b ..."
+git rebase "origin/$b"
